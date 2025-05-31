@@ -8,8 +8,7 @@ export default function Home() {
   const apikey = "https://www.omdbapi.com/?apikey=a4d5b9";
   const router = useRouter();
 
-  interface HandleInputEvent extends React.ChangeEvent<HTMLInputElement> {}
-  interface SearchEvent extends React.KeyboardEvent<HTMLInputElement> {}
+// Removed duplicate search function declaration to fix redeclaration error
 
   interface Movie {
     Title: string;
@@ -21,7 +20,7 @@ export default function Home() {
     Actors?: string;
     Genre?: string;
     Plot?: string;
-    [key: string]: unknown;
+    [key: string]: any;
   }
 
   interface OMDBResponse {
@@ -29,7 +28,7 @@ export default function Home() {
     totalResults?: string;
     Response: string;
     Error?: string;
-    [key: string]: unknown;
+    [key: string]: any;
   }
 
   const [s, setS] = useState("");
@@ -49,7 +48,7 @@ export default function Home() {
     "tt0078748", // Alien
   ];
 
-  const handleInput = (e: HandleInputEvent): void => {
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>): void => {
     setS(e.target.value);
   };
 
@@ -77,7 +76,7 @@ export default function Home() {
     }
   };
 
-  const search = (e: SearchEvent): void => {
+  const search = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === "Enter") {
       setLoading(true);
       axios
