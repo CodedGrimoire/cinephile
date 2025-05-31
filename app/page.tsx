@@ -317,8 +317,9 @@ export default function Home() {
                 </p>
                 {modalMovie.Plot && (
                   <p className="text-white/80 text-sm italic">
-                    "{modalMovie.Plot}"
-                  </p>
+  {"\"" + modalMovie.Plot + "\""}
+</p>
+
                 )}
               </div>
             </div>
