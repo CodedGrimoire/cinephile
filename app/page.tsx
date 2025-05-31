@@ -20,7 +20,8 @@ export default function Home() {
     Actors?: string;
     Genre?: string;
     Plot?: string;
-    [key: string]: any;
+    [key: string]: string | number | boolean | undefined;
+
   }
 
   interface OMDBResponse {
@@ -28,7 +29,6 @@ export default function Home() {
     totalResults?: string;
     Response: string;
     Error?: string;
-    [key: string]: any;
   }
 
   const [s, setS] = useState("");
