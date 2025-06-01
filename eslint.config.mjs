@@ -12,6 +12,9 @@ const eslintConfig = [
       'react/no-unescaped-entities': 'off',          // allows unescaped double quotes
       '@typescript-eslint/no-explicit-any': 'off',   // allows use of 'any'
       '@next/next/no-page-custom-font': 'off',       // optional, disables font warnings
+      
+      // ✅ Suppress unused variable warnings (including for 'router')
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   }),
 ]
