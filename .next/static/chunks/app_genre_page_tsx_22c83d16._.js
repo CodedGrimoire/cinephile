@@ -60,6 +60,7 @@ function GenrePage() {
     const [movies, setMovies] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
     const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [modalMovie, setModalMovie] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    const [addedMessage, setAddedMessage] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const toggleGenre = (genre)=>{
         setSelectedGenres((prev)=>prev.includes(genre) ? prev.filter((g)=>g !== genre) : [
                 ...prev,
@@ -69,6 +70,16 @@ function GenrePage() {
     const clearGenres = ()=>{
         setSelectedGenres([]);
         setMovies([]);
+    };
+    const addToList = (movie)=>{
+        const list = JSON.parse(localStorage.getItem("mylist") || "[]");
+        const exists = list.some((m)=>m.imdbID === movie.imdbID);
+        if (!exists) {
+            list.push(movie);
+            localStorage.setItem("mylist", JSON.stringify(list));
+            setAddedMessage(`${movie.Title} has been added to your list.`);
+            setTimeout(()=>setAddedMessage(null), 2500);
+        }
     };
     const fetchMoviesByGenre = async ()=>{
         if (selectedGenres.length === 0) return;
@@ -96,7 +107,7 @@ function GenrePage() {
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "min-h-screen w-full relative overflow-hidden text-white",
         style: {
-            backgroundImage: `url('https://i.pinimg.com/originals/a6/66/c0/a666c011c80315ad3c3a49b8e7d2ba06.gif')`,
+            backgroundImage: `url('https://media.tenor.com/bZEUn3ywcQQAAAAM/stormcastle-count-down.gif')`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
@@ -108,7 +119,7 @@ function GenrePage() {
                 className: "absolute inset-0 bg-black/60 backdrop-blur-sm"
             }, void 0, false, {
                 fileName: "[project]/app/genre/page.tsx",
-                lineNumber: 96,
+                lineNumber: 108,
                 columnNumber: 7
             }, this),
             loading && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -118,7 +129,7 @@ function GenrePage() {
                         className: "loader"
                     }, void 0, false, {
                         fileName: "[project]/app/genre/page.tsx",
-                        lineNumber: 101,
+                        lineNumber: 112,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("style", {
@@ -129,7 +140,6 @@ function GenrePage() {
               height: 100px;
               border: 24px solid #FFF;
               border-radius: 50%;
-              box-sizing: border-box;
               animation: eat 1s linear infinite;
             }
             .loader::after, .loader::before {
@@ -142,7 +152,6 @@ function GenrePage() {
               width: 15px;
               height: 15px;
               border-radius: 50%;
-              box-sizing: border-box;
               opacity: 0;
               animation: move 2s linear infinite;
             }
@@ -161,33 +170,32 @@ function GenrePage() {
           `
                     }, void 0, false, {
                         fileName: "[project]/app/genre/page.tsx",
-                        lineNumber: 102,
+                        lineNumber: 113,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/genre/page.tsx",
-                lineNumber: 100,
+                lineNumber: 111,
+                columnNumber: 9
+            }, this),
+            addedMessage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "fixed top-6 left-1/2 transform -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-2 rounded-lg shadow-lg",
+                children: addedMessage
+            }, void 0, false, {
+                fileName: "[project]/app/genre/page.tsx",
+                lineNumber: 152,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "relative z-10 p-6 max-w-7xl mx-auto",
                 children: [
-                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                        onClick: ()=>router.push("/"),
-                        className: "mb-6 px-4 py-2 bg-white/10 text-white border border-white/20 rounded-full hover:bg-white/20 backdrop-blur-md transition-all",
-                        children: "⬅ Back to Home"
-                    }, void 0, false, {
-                        fileName: "[project]/app/genre/page.tsx",
-                        lineNumber: 143,
-                        columnNumber: 9
-                    }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
                         className: "text-4xl md:text-5xl font-bold mb-4 drop-shadow-[0_0_10px_white]",
                         children: "Genre Based Filtering"
                     }, void 0, false, {
                         fileName: "[project]/app/genre/page.tsx",
-                        lineNumber: 150,
+                        lineNumber: 158,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -195,7 +203,7 @@ function GenrePage() {
                         children: "Click genres below to find movies that match your interests."
                     }, void 0, false, {
                         fileName: "[project]/app/genre/page.tsx",
-                        lineNumber: 153,
+                        lineNumber: 161,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -207,7 +215,7 @@ function GenrePage() {
                                     children: genre
                                 }, genre, false, {
                                     fileName: "[project]/app/genre/page.tsx",
-                                    lineNumber: 159,
+                                    lineNumber: 167,
                                     columnNumber: 13
                                 }, this)),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -216,20 +224,19 @@ function GenrePage() {
                                 children: "❌ Clear All"
                             }, void 0, false, {
                                 fileName: "[project]/app/genre/page.tsx",
-                                lineNumber: 171,
+                                lineNumber: 179,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/app/genre/page.tsx",
-                        lineNumber: 157,
+                        lineNumber: 165,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6",
                         children: movies.map((movie)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                onClick: ()=>setModalMovie(movie),
-                                className: "cursor-pointer bg-white/10 backdrop-blur-md rounded-xl p-4 text-center border border-white/20 hover:scale-105 transition",
+                                className: "bg-white/10 backdrop-blur-md rounded-xl p-4 text-center border border-white/20 hover:scale-105 transition",
                                 children: [
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
                                         src: movie.Poster !== "N/A" ? movie.Poster : "/placeholder.png",
@@ -237,7 +244,7 @@ function GenrePage() {
                                         className: "w-full h-64 object-cover rounded-lg mb-4"
                                     }, void 0, false, {
                                         fileName: "[project]/app/genre/page.tsx",
-                                        lineNumber: 186,
+                                        lineNumber: 193,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
@@ -245,7 +252,7 @@ function GenrePage() {
                                         children: movie.Title
                                     }, void 0, false, {
                                         fileName: "[project]/app/genre/page.tsx",
-                                        lineNumber: 191,
+                                        lineNumber: 198,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -253,7 +260,7 @@ function GenrePage() {
                                         children: movie.Year
                                     }, void 0, false, {
                                         fileName: "[project]/app/genre/page.tsx",
-                                        lineNumber: 192,
+                                        lineNumber: 199,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -264,7 +271,7 @@ function GenrePage() {
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/app/genre/page.tsx",
-                                        lineNumber: 193,
+                                        lineNumber: 200,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -272,18 +279,27 @@ function GenrePage() {
                                         children: movie.Genre
                                     }, void 0, false, {
                                         fileName: "[project]/app/genre/page.tsx",
-                                        lineNumber: 194,
+                                        lineNumber: 201,
+                                        columnNumber: 15
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                        onClick: ()=>addToList(movie),
+                                        className: "mt-2 px-3 py-1 text-sm bg-green-600 hover:bg-green-700 rounded-full text-white",
+                                        children: "➕ Add to List"
+                                    }, void 0, false, {
+                                        fileName: "[project]/app/genre/page.tsx",
+                                        lineNumber: 202,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, movie.imdbID, true, {
                                 fileName: "[project]/app/genre/page.tsx",
-                                lineNumber: 181,
+                                lineNumber: 189,
                                 columnNumber: 13
                             }, this))
                     }, void 0, false, {
                         fileName: "[project]/app/genre/page.tsx",
-                        lineNumber: 179,
+                        lineNumber: 187,
                         columnNumber: 9
                     }, this),
                     movies.length === 0 && !loading && selectedGenres.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -291,124 +307,23 @@ function GenrePage() {
                         children: "No movies found for selected genres."
                     }, void 0, false, {
                         fileName: "[project]/app/genre/page.tsx",
-                        lineNumber: 200,
-                        columnNumber: 11
-                    }, this),
-                    modalMovie && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                        className: "fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 px-4",
-                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "bg-white text-black max-w-md w-full rounded-xl p-6 relative",
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                                    className: "absolute top-2 right-2 text-black/60 hover:text-black",
-                                    onClick: ()=>setModalMovie(null),
-                                    children: "✖"
-                                }, void 0, false, {
-                                    fileName: "[project]/app/genre/page.tsx",
-                                    lineNumber: 208,
-                                    columnNumber: 15
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                    src: modalMovie.Poster !== "N/A" ? modalMovie.Poster : "/placeholder.png",
-                                    alt: modalMovie.Title,
-                                    className: "w-full h-64 object-cover rounded-lg mb-4"
-                                }, void 0, false, {
-                                    fileName: "[project]/app/genre/page.tsx",
-                                    lineNumber: 214,
-                                    columnNumber: 15
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                                    className: "text-2xl font-bold mb-2",
-                                    children: modalMovie.Title
-                                }, void 0, false, {
-                                    fileName: "[project]/app/genre/page.tsx",
-                                    lineNumber: 219,
-                                    columnNumber: 15
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                    className: "text-sm text-gray-700 mb-2",
-                                    children: [
-                                        modalMovie.Year,
-                                        " • ",
-                                        modalMovie.Genre
-                                    ]
-                                }, void 0, true, {
-                                    fileName: "[project]/app/genre/page.tsx",
-                                    lineNumber: 220,
-                                    columnNumber: 15
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                    className: "text-sm text-yellow-600 mb-2",
-                                    children: [
-                                        "⭐ IMDb: ",
-                                        modalMovie.imdbRating
-                                    ]
-                                }, void 0, true, {
-                                    fileName: "[project]/app/genre/page.tsx",
-                                    lineNumber: 221,
-                                    columnNumber: 15
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                    className: "text-sm text-gray-800 mb-2",
-                                    children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
-                                            children: "Cast:"
-                                        }, void 0, false, {
-                                            fileName: "[project]/app/genre/page.tsx",
-                                            lineNumber: 222,
-                                            columnNumber: 57
-                                        }, this),
-                                        " ",
-                                        modalMovie.Actors
-                                    ]
-                                }, void 0, true, {
-                                    fileName: "[project]/app/genre/page.tsx",
-                                    lineNumber: 222,
-                                    columnNumber: 15
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                    className: "text-sm text-gray-800 whitespace-pre-wrap",
-                                    children: [
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("strong", {
-                                            children: "Description:"
-                                        }, void 0, false, {
-                                            fileName: "[project]/app/genre/page.tsx",
-                                            lineNumber: 224,
-                                            columnNumber: 17
-                                        }, this),
-                                        " ",
-                                        modalMovie.Plot
-                                    ]
-                                }, void 0, true, {
-                                    fileName: "[project]/app/genre/page.tsx",
-                                    lineNumber: 223,
-                                    columnNumber: 15
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/app/genre/page.tsx",
-                            lineNumber: 207,
-                            columnNumber: 13
-                        }, this)
-                    }, void 0, false, {
-                        fileName: "[project]/app/genre/page.tsx",
-                        lineNumber: 206,
+                        lineNumber: 213,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/genre/page.tsx",
-                lineNumber: 142,
+                lineNumber: 157,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/genre/page.tsx",
-        lineNumber: 85,
+        lineNumber: 97,
         columnNumber: 5
     }, this);
 }
-_s(GenrePage, "FExzp2WgAqrH0cgcdEjau2qwO/o=", false, function() {
+_s(GenrePage, "iULMXEz9pyFB4RkTWt9hyJBkxOI=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
     ];

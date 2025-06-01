@@ -2,6 +2,9 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { db, auth } from "@/firebaseConfig";
+import { doc, setDoc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 const allGenres = [
   "Action", "Adventure", "Animation", "Biography", "Comedy", "Crime",
@@ -29,7 +32,15 @@ export default function GenrePage() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(false);
-  const [modalMovie, setModalMovie] = useState<Movie | null>(null);
+  const [addedMessage, setAddedMessage] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) setUserId(user.uid);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const toggleGenre = (genre: string) => {
     setSelectedGenres((prev) =>
@@ -42,15 +53,33 @@ export default function GenrePage() {
     setMovies([]);
   };
 
+  const addToList = async (movie: Movie) => {
+    if (!userId) return;
+    const userDoc = doc(db, "watchlists", userId);
+
+    try {
+      const snapshot = await getDoc(userDoc);
+      if (!snapshot.exists()) {
+        await setDoc(userDoc, { movies: [movie] });
+      } else {
+        await updateDoc(userDoc, {
+          movies: arrayUnion(movie),
+        });
+      }
+      setAddedMessage(`${movie.Title} has been added to your list.`);
+      setTimeout(() => setAddedMessage(null), 2500);
+    } catch (error) {
+      console.error("Error saving to Firestore:", error);
+    }
+  };
+
   const fetchMoviesByGenre = async () => {
     if (selectedGenres.length === 0) return;
     setLoading(true);
 
     try {
       const queries = await Promise.all(
-        selectedGenres.map((genre) =>
-          axios.get(`${apikey}&s=${genre}`)
-        )
+        selectedGenres.map((genre) => axios.get(`${apikey}&s=${genre}`))
       );
 
       const results = (
@@ -85,7 +114,7 @@ export default function GenrePage() {
     <div
       className="min-h-screen w-full relative overflow-hidden text-white"
       style={{
-        backgroundImage: `url('https://i.pinimg.com/originals/a6/66/c0/a666c011c80315ad3c3a49b8e7d2ba06.gif')`,
+        backgroundImage: `url('https://media.tenor.com/bZEUn3ywcQQAAAAM/stormcastle-count-down.gif')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
@@ -95,7 +124,6 @@ export default function GenrePage() {
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
 
-      {/* Loader */}
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
           <span className="loader"></span>
@@ -106,7 +134,6 @@ export default function GenrePage() {
               height: 100px;
               border: 24px solid #FFF;
               border-radius: 50%;
-              box-sizing: border-box;
               animation: eat 1s linear infinite;
             }
             .loader::after, .loader::before {
@@ -119,7 +146,6 @@ export default function GenrePage() {
               width: 15px;
               height: 15px;
               border-radius: 50%;
-              box-sizing: border-box;
               opacity: 0;
               animation: move 2s linear infinite;
             }
@@ -139,14 +165,13 @@ export default function GenrePage() {
         </div>
       )}
 
-      <div className="relative z-10 p-6 max-w-7xl mx-auto">
-        <button
-          onClick={() => router.push("/")}
-          className="mb-6 px-4 py-2 bg-white/10 text-white border border-white/20 rounded-full hover:bg-white/20 backdrop-blur-md transition-all"
-        >
-          ⬅ Back to Home
-        </button>
+      {addedMessage && (
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-2 rounded-lg shadow-lg">
+          {addedMessage}
+        </div>
+      )}
 
+      <div className="relative z-10 p-6 max-w-7xl mx-auto">
         <h1 className="text-4xl md:text-5xl font-bold mb-4 drop-shadow-[0_0_10px_white]">
           Genre Based Filtering
         </h1>
@@ -180,8 +205,7 @@ export default function GenrePage() {
           {movies.map((movie) => (
             <div
               key={movie.imdbID}
-              onClick={() => setModalMovie(movie)}
-              className="cursor-pointer bg-white/10 backdrop-blur-md rounded-xl p-4 text-center border border-white/20 hover:scale-105 transition"
+              className="bg-white/10 backdrop-blur-md rounded-xl p-4 text-center border border-white/20 hover:scale-105 transition"
             >
               <img
                 src={movie.Poster !== "N/A" ? movie.Poster : "/placeholder.png"}
@@ -192,6 +216,12 @@ export default function GenrePage() {
               <p className="text-white/70">{movie.Year}</p>
               <p className="text-yellow-300 text-sm">⭐ {movie.imdbRating}</p>
               <p className="text-white/60 text-xs mt-1">{movie.Genre}</p>
+              <button
+                onClick={() => addToList(movie)}
+                className="mt-2 px-3 py-1 text-sm bg-green-600 hover:bg-green-700 rounded-full text-white"
+              >
+                ➕ Add to List
+              </button>
             </div>
           ))}
         </div>
@@ -200,31 +230,6 @@ export default function GenrePage() {
           <p className="text-center text-white/70 mt-12 text-lg">
             No movies found for selected genres.
           </p>
-        )}
-
-        {modalMovie && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 px-4">
-            <div className="bg-white text-black max-w-md w-full rounded-xl p-6 relative">
-              <button
-                className="absolute top-2 right-2 text-black/60 hover:text-black"
-                onClick={() => setModalMovie(null)}
-              >
-                ✖
-              </button>
-              <img
-                src={modalMovie.Poster !== "N/A" ? modalMovie.Poster : "/placeholder.png"}
-                alt={modalMovie.Title}
-                className="w-full h-64 object-cover rounded-lg mb-4"
-              />
-              <h2 className="text-2xl font-bold mb-2">{modalMovie.Title}</h2>
-              <p className="text-sm text-gray-700 mb-2">{modalMovie.Year} • {modalMovie.Genre}</p>
-              <p className="text-sm text-yellow-600 mb-2">⭐ IMDb: {modalMovie.imdbRating}</p>
-              <p className="text-sm text-gray-800 mb-2"><strong>Cast:</strong> {modalMovie.Actors}</p>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap">
-                <strong>Description:</strong> {modalMovie.Plot}
-              </p>
-            </div>
-          </div>
         )}
       </div>
     </div>
