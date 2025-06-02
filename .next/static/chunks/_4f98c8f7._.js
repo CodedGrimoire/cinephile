@@ -630,6 +630,225 @@ if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelper
     __turbopack_context__.k.registerExports(module, globalThis.$RefreshHelpers$);
 }
 }}),
+"[project]/app/components/FeaturedMoviesFetcher.tsx [app-client] (ecmascript)": ((__turbopack_context__) => {
+"use strict";
+
+var { g: global, __dirname, k: __turbopack_refresh__, m: module } = __turbopack_context__;
+{
+// components/FeaturedMoviesFetcher.ts
+__turbopack_context__.s({
+    "FeaturedMoviesFetcher": (()=>FeaturedMoviesFetcher),
+    "featuredMoviesFetcher": (()=>featuredMoviesFetcher),
+    "useFeaturedMovies": (()=>useFeaturedMovies)
+});
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
+;
+class FeaturedMoviesFetcher {
+    apikey = "https://www.omdbapi.com/?apikey=a4d5b9";
+    // Curated lists of high-rated recent movies (2020-2025) by genre - NO DUPLICATES
+    genreMovies = {
+        Action: [
+            "tt6443346",
+            "tt9376612",
+            "tt9114286",
+            "tt15239678",
+            "tt6334354",
+            "tt10872600",
+            "tt1745960"
+        ],
+        Animation: [
+            "tt7146812",
+            "tt2948372",
+            "tt12801262",
+            "tt13650600",
+            "tt10954600",
+            "tt5104604",
+            "tt2953050"
+        ],
+        Comedy: [
+            "tt6139732",
+            "tt11286314",
+            "tt9243946",
+            "tt11083552",
+            "tt8367814",
+            "tt6791350",
+            "tt11286316"
+        ],
+        Drama: [
+            "tt9770150",
+            "tt10633456",
+            "tt12789558",
+            "tt10095582",
+            "tt11813216",
+            "tt14208870",
+            "tt10366460"
+        ],
+        Horror: [
+            "tt8332922",
+            "tt11007312",
+            "tt11245972",
+            "tt7144666",
+            "tt15071532",
+            "tt10954984",
+            "tt12758060"
+        ],
+        Romance: [
+            "tt12747748",
+            "tt9647768",
+            "tt15398776",
+            "tt13651794",
+            "tt11851214",
+            "tt6723592",
+            "tt11286318"
+        ],
+        SciFi: [
+            "tt1160419",
+            "tt15359898",
+            "tt11286020",
+            "tt9777666",
+            "tt6710474",
+            "tt10838180",
+            "tt11286322"
+        ],
+        Thriller: [
+            "tt2382320",
+            "tt9731534",
+            "tt1877830",
+            "tt7846844",
+            "tt11564570",
+            "tt11286324",
+            "tt10838056"
+        ]
+    };
+    // Simple fallback list of guaranteed high-rated movies
+    fallbackMovies = [
+        "tt0111161",
+        "tt0468569",
+        "tt1375666",
+        "tt0109830",
+        "tt0133093",
+        "tt0110912",
+        "tt0167260",
+        "tt0816692"
+    ];
+    // Fetch detailed movie information
+    async fetchMovieDetails(movieId) {
+        try {
+            const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`${this.apikey}&i=${movieId}&plot=short`);
+            const movieData = data;
+            return {
+                Title: movieData.Title,
+                Year: movieData.Year,
+                imdbID: movieData.imdbID,
+                Type: movieData.Type,
+                Poster: movieData.Poster,
+                imdbRating: movieData.imdbRating,
+                Actors: movieData.Actors,
+                Genre: movieData.Genre,
+                Plot: movieData.Plot
+            };
+        } catch (err) {
+            console.error(`Error fetching movie ${movieId}:`, err);
+            return null;
+        }
+    }
+    // Get one movie from each genre (8 total) - ENSURES NO DUPLICATES
+    async getFeaturedMovies(count = 8) {
+        const featuredMovies = [];
+        const usedMovieIds = new Set(); // Track used IDs to prevent duplicates
+        const genreNames = Object.keys(this.genreMovies);
+        try {
+            // Get one random movie from each genre
+            const promises = genreNames.slice(0, count).map(async (genre)=>{
+                const genreMovieIds = this.genreMovies[genre];
+                // Find an unused movie from this genre
+                let attempts = 0;
+                let randomMovieId = "";
+                do {
+                    randomMovieId = genreMovieIds[Math.floor(Math.random() * genreMovieIds.length)];
+                    attempts++;
+                }while (usedMovieIds.has(randomMovieId) && attempts < 10)
+                // Mark this ID as used
+                if (!usedMovieIds.has(randomMovieId)) {
+                    usedMovieIds.add(randomMovieId);
+                    return this.fetchMovieDetails(randomMovieId);
+                }
+                return null;
+            });
+            const results = await Promise.all(promises);
+            // Filter out any failed fetches and ensure no duplicates
+            results.forEach((movie)=>{
+                if (movie && !featuredMovies.some((existing)=>existing.imdbID === movie.imdbID)) {
+                    featuredMovies.push(movie);
+                }
+            });
+            // If we don't have enough movies, add from fallback (ensuring no duplicates)
+            if (featuredMovies.length < count) {
+                const needed = count - featuredMovies.length;
+                const availableFallbacks = this.fallbackMovies.filter((id)=>!featuredMovies.some((movie)=>movie.imdbID === id));
+                const shuffledFallbacks = availableFallbacks.sort(()=>Math.random() - 0.5);
+                const fallbackPromises = shuffledFallbacks.slice(0, needed).map((id)=>this.fetchMovieDetails(id));
+                const fallbackResults = await Promise.all(fallbackPromises);
+                fallbackResults.forEach((movie)=>{
+                    if (movie && !featuredMovies.some((existing)=>existing.imdbID === movie.imdbID)) {
+                        featuredMovies.push(movie);
+                    }
+                });
+            }
+            // Final safety check - remove any duplicates that might have slipped through
+            const uniqueMovies = featuredMovies.filter((movie, index, self)=>index === self.findIndex((m)=>m.imdbID === movie.imdbID));
+            return uniqueMovies;
+        } catch (error) {
+            console.error("Error fetching featured movies:", error);
+            // Emergency fallback - just return fallback movies (ensuring no duplicates)
+            return this.getFallbackMovies(count);
+        }
+    }
+    // Emergency fallback method - ENSURES NO DUPLICATES
+    async getFallbackMovies(count) {
+        const movies = [];
+        const usedIds = new Set();
+        const shuffledFallbacks = [
+            ...this.fallbackMovies
+        ].sort(()=>Math.random() - 0.5);
+        const promises = shuffledFallbacks.slice(0, count).map(async (id)=>{
+            if (!usedIds.has(id)) {
+                usedIds.add(id);
+                return this.fetchMovieDetails(id);
+            }
+            return null;
+        });
+        const results = await Promise.all(promises);
+        results.forEach((movie)=>{
+            if (movie && !movies.some((existing)=>existing.imdbID === movie.imdbID)) {
+                movies.push(movie);
+            }
+        });
+        return movies;
+    }
+    // Method to get movies from a specific year
+    async getMoviesByYear(year, minRating = 7.5, count = 10) {
+        // For simplicity, just return random featured movies
+        // You can enhance this later if needed
+        return this.getFeaturedMovies(count);
+    }
+    // Method to refresh featured movies
+    async refreshFeaturedMovies(count = 8) {
+        return this.getFeaturedMovies(count);
+    }
+}
+const featuredMoviesFetcher = new FeaturedMoviesFetcher();
+const useFeaturedMovies = ()=>{
+    return {
+        getFeaturedMovies: (count)=>featuredMoviesFetcher.getFeaturedMovies(count),
+        getMoviesByYear: (year, minRating, count)=>featuredMoviesFetcher.getMoviesByYear(year, minRating, count),
+        refreshFeaturedMovies: (count)=>featuredMoviesFetcher.refreshFeaturedMovies(count)
+    };
+};
+if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
+    __turbopack_context__.k.registerExports(module, globalThis.$RefreshHelpers$);
+}
+}}),
 "[project]/app/homepage/page.tsx [app-client] (ecmascript)": ((__turbopack_context__) => {
 "use strict";
 
@@ -646,6 +865,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$MovieCa
 var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$MovieModal$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/MovieModal.tsx [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$UserDropdown$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/UserDropdown.tsx [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$LoadingSpinner$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/LoadingSpinner.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$FeaturedMoviesFetcher$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/app/components/FeaturedMoviesFetcher.tsx [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$axios$2f$lib$2f$axios$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/axios/lib/axios.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$firebase$2f$auth$2f$dist$2f$esm$2f$index$2e$esm$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$module__evaluation$3e$__ = __turbopack_context__.i("[project]/node_modules/firebase/auth/dist/esm/index.esm.js [app-client] (ecmascript) <module evaluation>");
@@ -669,6 +889,7 @@ var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
+;
 function Homepage() {
     _s();
     const apikey = "https://www.omdbapi.com/?apikey=a4d5b9";
@@ -679,19 +900,10 @@ function Homepage() {
     const [s, setS] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     const [results, setResults] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
     const [featuredMovies, setFeaturedMovies] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
+    const [featuredLoading, setFeaturedLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
     const [loading, setLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [modalMovie, setModalMovie] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [userId, setUserId] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
-    const featuredMovieIDs = [
-        "tt0133093",
-        "tt1375666",
-        "tt0109830",
-        "tt0110912",
-        "tt0114709",
-        "tt0468569",
-        "tt0107048",
-        "tt0078748"
-    ];
     const handleInput = (e)=>{
         setS(e.target.value);
     };
@@ -764,6 +976,18 @@ function Homepage() {
     const handleModalClose = ()=>{
         setModalMovie(null);
     };
+    // Function to refresh featured movies
+    const refreshFeaturedMovies = async ()=>{
+        setFeaturedLoading(true);
+        try {
+            const movies = await __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$FeaturedMoviesFetcher$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["featuredMoviesFetcher"].getFeaturedMovies(8);
+            setFeaturedMovies(movies);
+        } catch (error) {
+            console.error("Error refreshing featured movies:", error);
+        } finally{
+            setFeaturedLoading(false);
+        }
+    };
     // Effects
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "Homepage.useEffect": ()=>{
@@ -785,14 +1009,20 @@ function Homepage() {
             })["Homepage.useEffect"];
         }
     }["Homepage.useEffect"], []);
+    // Fetch featured movies on component mount
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "Homepage.useEffect": ()=>{
             const fetchFeatured = {
                 "Homepage.useEffect.fetchFeatured": async ()=>{
-                    const movies = await Promise.all(featuredMovieIDs.map({
-                        "Homepage.useEffect.fetchFeatured": (id)=>fetchMovieDetails(id)
-                    }["Homepage.useEffect.fetchFeatured"]));
-                    setFeaturedMovies(movies);
+                    setFeaturedLoading(true);
+                    try {
+                        const movies = await __TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$FeaturedMoviesFetcher$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["featuredMoviesFetcher"].getFeaturedMovies(8);
+                        setFeaturedMovies(movies);
+                    } catch (error) {
+                        console.error("Error fetching featured movies:", error);
+                    } finally{
+                        setFeaturedLoading(false);
+                    }
                 }
             }["Homepage.useEffect.fetchFeatured"];
             fetchFeatured();
@@ -812,7 +1042,7 @@ function Homepage() {
                 className: "absolute inset-0 bg-gradient-to-br from-black/40 via-purple-900/20 to-blue-900/30"
             }, void 0, false, {
                 fileName: "[project]/app/homepage/page.tsx",
-                lineNumber: 175,
+                lineNumber: 186,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -827,7 +1057,7 @@ function Homepage() {
                         }
                     }, void 0, false, {
                         fileName: "[project]/app/homepage/page.tsx",
-                        lineNumber: 179,
+                        lineNumber: 190,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -839,7 +1069,7 @@ function Homepage() {
                         }
                     }, void 0, false, {
                         fileName: "[project]/app/homepage/page.tsx",
-                        lineNumber: 180,
+                        lineNumber: 191,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -851,7 +1081,7 @@ function Homepage() {
                         }
                     }, void 0, false, {
                         fileName: "[project]/app/homepage/page.tsx",
-                        lineNumber: 181,
+                        lineNumber: 192,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -863,20 +1093,20 @@ function Homepage() {
                         }
                     }, void 0, false, {
                         fileName: "[project]/app/homepage/page.tsx",
-                        lineNumber: 182,
+                        lineNumber: 193,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/homepage/page.tsx",
-                lineNumber: 178,
+                lineNumber: 189,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$LoadingSpinner$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                 isLoading: loading
             }, void 0, false, {
                 fileName: "[project]/app/homepage/page.tsx",
-                lineNumber: 186,
+                lineNumber: 197,
                 columnNumber: 7
             }, this),
             addedMessage && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -889,7 +1119,7 @@ function Homepage() {
                             children: "✨"
                         }, void 0, false, {
                             fileName: "[project]/app/homepage/page.tsx",
-                            lineNumber: 192,
+                            lineNumber: 203,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -897,25 +1127,25 @@ function Homepage() {
                             children: addedMessage
                         }, void 0, false, {
                             fileName: "[project]/app/homepage/page.tsx",
-                            lineNumber: 193,
+                            lineNumber: 204,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/app/homepage/page.tsx",
-                    lineNumber: 191,
+                    lineNumber: 202,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/app/homepage/page.tsx",
-                lineNumber: 190,
+                lineNumber: 201,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$UserDropdown$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                 photoURL: photoURL
             }, void 0, false, {
                 fileName: "[project]/app/homepage/page.tsx",
-                lineNumber: 199,
+                lineNumber: 210,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -938,20 +1168,20 @@ function Homepage() {
                                                     className: "w-20 h-20 md:w-28 md:h-28 rounded-full object-cover shadow-2xl ring-4 ring-white/20 backdrop-blur-sm"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/homepage/page.tsx",
-                                                    lineNumber: 212,
+                                                    lineNumber: 223,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                     className: "absolute inset-0 rounded-full bg-gradient-to-br from-white/10 to-transparent"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/homepage/page.tsx",
-                                                    lineNumber: 217,
+                                                    lineNumber: 228,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 211,
+                                            lineNumber: 222,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -962,26 +1192,26 @@ function Homepage() {
                                                     children: "MovieHub"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/homepage/page.tsx",
-                                                    lineNumber: 221,
+                                                    lineNumber: 232,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                                     className: "h-1 w-24 bg-gradient-to-r from-blue-400 to-purple-400 mx-auto mt-2 rounded-full"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/homepage/page.tsx",
-                                                    lineNumber: 224,
+                                                    lineNumber: 235,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 220,
+                                            lineNumber: 231,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 210,
+                                    lineNumber: 221,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -991,12 +1221,12 @@ function Homepage() {
                                         children: "Your ultimate destination for discovering, exploring, and organizing movies"
                                     }, void 0, false, {
                                         fileName: "[project]/app/homepage/page.tsx",
-                                        lineNumber: 230,
+                                        lineNumber: 241,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 229,
+                                    lineNumber: 240,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1009,12 +1239,12 @@ function Homepage() {
                                                 search: search
                                             }, void 0, false, {
                                                 fileName: "[project]/app/homepage/page.tsx",
-                                                lineNumber: 238,
+                                                lineNumber: 249,
                                                 columnNumber: 17
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 237,
+                                            lineNumber: 248,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1028,7 +1258,7 @@ function Homepage() {
                                                         children: "🎭"
                                                     }, void 0, false, {
                                                         fileName: "[project]/app/homepage/page.tsx",
-                                                        lineNumber: 246,
+                                                        lineNumber: 257,
                                                         columnNumber: 19
                                                     }, this),
                                                     "Genre Based Filtering",
@@ -1037,35 +1267,35 @@ function Homepage() {
                                                         children: "→"
                                                     }, void 0, false, {
                                                         fileName: "[project]/app/homepage/page.tsx",
-                                                        lineNumber: 248,
+                                                        lineNumber: 259,
                                                         columnNumber: 19
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/app/homepage/page.tsx",
-                                                lineNumber: 242,
+                                                lineNumber: 253,
                                                 columnNumber: 17
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 241,
+                                            lineNumber: 252,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 236,
+                                    lineNumber: 247,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/app/homepage/page.tsx",
-                            lineNumber: 207,
+                            lineNumber: 218,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/homepage/page.tsx",
-                        lineNumber: 204,
+                        lineNumber: 215,
                         columnNumber: 9
                     }, this),
                     results.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1081,20 +1311,20 @@ function Homepage() {
                                             children: "🔍 Search Results"
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 260,
+                                            lineNumber: 271,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "h-1 w-20 bg-gradient-to-r from-cyan-400 to-blue-400 mx-auto rounded-full"
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 263,
+                                            lineNumber: 274,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 259,
+                                    lineNumber: 270,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1106,23 +1336,23 @@ function Homepage() {
                                             showAddButton: true
                                         }, movie.imdbID, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 268,
+                                            lineNumber: 279,
                                             columnNumber: 19
                                         }, this))
                                 }, void 0, false, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 266,
+                                    lineNumber: 277,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/app/homepage/page.tsx",
-                            lineNumber: 258,
+                            lineNumber: 269,
                             columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/homepage/page.tsx",
-                        lineNumber: 257,
+                        lineNumber: 268,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1134,28 +1364,65 @@ function Homepage() {
                                     className: "jsx-fa79c0e020c8ddf9" + " " + "text-center mb-8",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                            className: "jsx-fa79c0e020c8ddf9" + " " + "inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 border border-white/20 mb-6",
+                                            className: "jsx-fa79c0e020c8ddf9" + " " + "flex items-center justify-center gap-4 mb-6",
                                             children: [
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    className: "jsx-fa79c0e020c8ddf9" + " " + "text-2xl",
-                                                    children: "⭐"
-                                                }, void 0, false, {
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "jsx-fa79c0e020c8ddf9" + " " + "inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 border border-white/20",
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                            className: "jsx-fa79c0e020c8ddf9" + " " + "text-2xl",
+                                                            children: "⭐"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/homepage/page.tsx",
+                                                            lineNumber: 300,
+                                                            columnNumber: 19
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                            className: "jsx-fa79c0e020c8ddf9" + " " + "text-lg font-semibold text-white/90",
+                                                            children: "Featured Collection"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/homepage/page.tsx",
+                                                            lineNumber: 301,
+                                                            columnNumber: 19
+                                                        }, this)
+                                                    ]
+                                                }, void 0, true, {
                                                     fileName: "[project]/app/homepage/page.tsx",
-                                                    lineNumber: 288,
+                                                    lineNumber: 299,
                                                     columnNumber: 17
                                                 }, this),
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    className: "jsx-fa79c0e020c8ddf9" + " " + "text-lg font-semibold text-white/90",
-                                                    children: "Featured Collection"
-                                                }, void 0, false, {
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                                    onClick: refreshFeaturedMovies,
+                                                    disabled: featuredLoading,
+                                                    title: "Refresh featured movies",
+                                                    className: "jsx-fa79c0e020c8ddf9" + " " + "px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/40 transition-all duration-300 text-white/80 hover:text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed",
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                            className: "jsx-fa79c0e020c8ddf9" + " " + `text-sm ${featuredLoading ? 'animate-spin' : ''}`,
+                                                            children: "🔄"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/homepage/page.tsx",
+                                                            lineNumber: 311,
+                                                            columnNumber: 19
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                            className: "jsx-fa79c0e020c8ddf9" + " " + "text-sm",
+                                                            children: "Refresh"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/app/homepage/page.tsx",
+                                                            lineNumber: 312,
+                                                            columnNumber: 19
+                                                        }, this)
+                                                    ]
+                                                }, void 0, true, {
                                                     fileName: "[project]/app/homepage/page.tsx",
-                                                    lineNumber: 289,
+                                                    lineNumber: 305,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 287,
+                                            lineNumber: 298,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -1163,31 +1430,53 @@ function Homepage() {
                                             children: "Must-Watch Movies"
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 292,
+                                            lineNumber: 316,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "jsx-fa79c0e020c8ddf9" + " " + "h-1 w-32 bg-gradient-to-r from-yellow-400 to-orange-400 mx-auto rounded-full mb-4"
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 296,
-                                            columnNumber: 15
-                                        }, this),
-                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "jsx-fa79c0e020c8ddf9" + " " + "text-white/80 text-lg max-w-2xl mx-auto leading-relaxed",
-                                            children: "Handpicked cinematic masterpieces that have captivated audiences worldwide"
-                                        }, void 0, false, {
-                                            fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 298,
+                                            lineNumber: 320,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 286,
+                                    lineNumber: 297,
                                     columnNumber: 13
                                 }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                featuredLoading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "jsx-fa79c0e020c8ddf9" + " " + "flex items-center justify-center py-20",
+                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "jsx-fa79c0e020c8ddf9" + " " + "text-center",
+                                        children: [
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                className: "jsx-fa79c0e020c8ddf9" + " " + "w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/homepage/page.tsx",
+                                                lineNumber: 329,
+                                                columnNumber: 19
+                                            }, this),
+                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                className: "jsx-fa79c0e020c8ddf9" + " " + "text-white/60",
+                                                children: "Loading amazing movies..."
+                                            }, void 0, false, {
+                                                fileName: "[project]/app/homepage/page.tsx",
+                                                lineNumber: 330,
+                                                columnNumber: 19
+                                            }, this)
+                                        ]
+                                    }, void 0, true, {
+                                        fileName: "[project]/app/homepage/page.tsx",
+                                        lineNumber: 328,
+                                        columnNumber: 17
+                                    }, this)
+                                }, void 0, false, {
+                                    fileName: "[project]/app/homepage/page.tsx",
+                                    lineNumber: 327,
+                                    columnNumber: 15
+                                }, this) : featuredMovies.length > 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: "jsx-fa79c0e020c8ddf9" + " " + "relative",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1198,30 +1487,30 @@ function Homepage() {
                                                     children: "←"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/homepage/page.tsx",
-                                                    lineNumber: 307,
-                                                    columnNumber: 17
+                                                    lineNumber: 337,
+                                                    columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                     className: "jsx-fa79c0e020c8ddf9",
                                                     children: "Scroll to explore"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/homepage/page.tsx",
-                                                    lineNumber: 308,
-                                                    columnNumber: 17
+                                                    lineNumber: 338,
+                                                    columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                     className: "jsx-fa79c0e020c8ddf9",
                                                     children: "→"
                                                 }, void 0, false, {
                                                     fileName: "[project]/app/homepage/page.tsx",
-                                                    lineNumber: 309,
-                                                    columnNumber: 17
+                                                    lineNumber: 339,
+                                                    columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 306,
-                                            columnNumber: 15
+                                            lineNumber: 336,
+                                            columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "jsx-fa79c0e020c8ddf9" + " " + "overflow-x-auto scrollbar-hide pb-4",
@@ -1236,43 +1525,76 @@ function Homepage() {
                                                             showAddButton: true
                                                         }, void 0, false, {
                                                             fileName: "[project]/app/homepage/page.tsx",
-                                                            lineNumber: 317,
-                                                            columnNumber: 23
+                                                            lineNumber: 347,
+                                                            columnNumber: 25
                                                         }, this)
                                                     }, movie.imdbID, false, {
                                                         fileName: "[project]/app/homepage/page.tsx",
-                                                        lineNumber: 316,
-                                                        columnNumber: 21
+                                                        lineNumber: 346,
+                                                        columnNumber: 23
                                                     }, this))
                                             }, void 0, false, {
                                                 fileName: "[project]/app/homepage/page.tsx",
-                                                lineNumber: 314,
-                                                columnNumber: 17
+                                                lineNumber: 344,
+                                                columnNumber: 19
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 313,
-                                            columnNumber: 15
+                                            lineNumber: 343,
+                                            columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "jsx-fa79c0e020c8ddf9" + " " + "absolute top-16 left-0 w-8 h-full bg-gradient-to-r from-black/20 to-transparent pointer-events-none rounded-l-3xl"
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 329,
-                                            columnNumber: 15
+                                            lineNumber: 359,
+                                            columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "jsx-fa79c0e020c8ddf9" + " " + "absolute top-16 right-0 w-8 h-full bg-gradient-to-l from-black/20 to-transparent pointer-events-none rounded-r-3xl"
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 330,
-                                            columnNumber: 15
+                                            lineNumber: 360,
+                                            columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 304,
-                                    columnNumber: 13
+                                    lineNumber: 334,
+                                    columnNumber: 15
+                                }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "jsx-fa79c0e020c8ddf9" + " " + "text-center py-20",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "jsx-fa79c0e020c8ddf9" + " " + "text-6xl mb-4",
+                                            children: "🎬"
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/homepage/page.tsx",
+                                            lineNumber: 364,
+                                            columnNumber: 17
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                            className: "jsx-fa79c0e020c8ddf9" + " " + "text-white/60 text-lg mb-4",
+                                            children: "Unable to load featured movies"
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/homepage/page.tsx",
+                                            lineNumber: 365,
+                                            columnNumber: 17
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                            onClick: refreshFeaturedMovies,
+                                            className: "jsx-fa79c0e020c8ddf9" + " " + "px-6 py-3 bg-gradient-to-r from-purple-500/80 to-blue-500/80 hover:from-purple-600/90 hover:to-blue-600/90 text-white backdrop-blur-md rounded-xl border border-white/30 transition-all duration-300 hover:scale-105",
+                                            children: "Try Again"
+                                        }, void 0, false, {
+                                            fileName: "[project]/app/homepage/page.tsx",
+                                            lineNumber: 366,
+                                            columnNumber: 17
+                                        }, this)
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/app/homepage/page.tsx",
+                                    lineNumber: 363,
+                                    columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
                                     id: "fa79c0e020c8ddf9",
@@ -1281,12 +1603,12 @@ function Homepage() {
                             ]
                         }, void 0, true, {
                             fileName: "[project]/app/homepage/page.tsx",
-                            lineNumber: 283,
+                            lineNumber: 294,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/homepage/page.tsx",
-                        lineNumber: 282,
+                        lineNumber: 293,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1302,7 +1624,7 @@ function Homepage() {
                                             children: "🎬"
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 350,
+                                            lineNumber: 392,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1310,20 +1632,20 @@ function Homepage() {
                                             children: "Powered by OMDB API"
                                         }, void 0, false, {
                                             fileName: "[project]/app/homepage/page.tsx",
-                                            lineNumber: 351,
+                                            lineNumber: 393,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 349,
+                                    lineNumber: 391,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: "h-px w-24 bg-gradient-to-r from-transparent via-white/30 to-transparent mx-auto"
                                 }, void 0, false, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 355,
+                                    lineNumber: 397,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1331,24 +1653,24 @@ function Homepage() {
                                     children: "Discover • Explore • Enjoy"
                                 }, void 0, false, {
                                     fileName: "[project]/app/homepage/page.tsx",
-                                    lineNumber: 356,
+                                    lineNumber: 398,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/app/homepage/page.tsx",
-                            lineNumber: 348,
+                            lineNumber: 390,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/app/homepage/page.tsx",
-                        lineNumber: 347,
+                        lineNumber: 389,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/app/homepage/page.tsx",
-                lineNumber: 201,
+                lineNumber: 212,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$app$2f$components$2f$MovieModal$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -1356,17 +1678,17 @@ function Homepage() {
                 onClose: handleModalClose
             }, void 0, false, {
                 fileName: "[project]/app/homepage/page.tsx",
-                lineNumber: 364,
+                lineNumber: 406,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/homepage/page.tsx",
-        lineNumber: 164,
+        lineNumber: 175,
         columnNumber: 5
     }, this);
 }
-_s(Homepage, "+auhZ5Tg3CEE8DYWiO7DkZ9S3v4=", false, function() {
+_s(Homepage, "BqXohbEwKsXmUSgc4kPfICZTLec=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
     ];
@@ -1380,4 +1702,4 @@ if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelper
 }}),
 }]);
 
-//# sourceMappingURL=_7e8aae01._.js.map
+//# sourceMappingURL=_4f98c8f7._.js.map
