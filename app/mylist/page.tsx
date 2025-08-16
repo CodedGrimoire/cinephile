@@ -103,24 +103,26 @@ export default function MyListPage() {
       <div className="flex gap-2">
         {!isWatched ? (
           <>
+           <button
+  onClick={(e) => {
+    e.stopPropagation();
+    markAsWatched(movie);
+  }}
+  className="px-3 py-2 bg-blue-500/20 text-blue-300 border border-blue-300/50 rounded-full hover:bg-blue-500/30 transition text-sm flex-1
+             hover:shadow-[0_0_8px_rgba(255,255,255,0.7)]"
+>
+  Watched
+</button>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                markAsWatched(movie);
-              }}
-              className="px-3 py-2 bg-blue-500/20 text-blue-300 border border-blue-300/50 rounded-full hover:bg-blue-500/30 transition text-sm flex-1"
-            >
-              Watched
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                removeFromList(movie);
-              }}
-              className="px-3 py-2 bg-purple-500/20 text-purple-300 border border-purple-300/50 rounded-full hover:bg-purple-500/30 transition text-sm flex-1"
-            >
-              Remove
-            </button>
+  onClick={(e) => {
+    e.stopPropagation();
+    removeFromList(movie);
+  }}
+  className="px-3 py-2 bg-purple-500/20 text-purple-300 border border-purple-300/50 rounded-full hover:bg-purple-500/30 transition text-sm flex-1
+             hover:shadow-[0_0_8px_rgba(255,255,255,0.7)]"
+>
+  Remove
+</button>
           </>
         ) : (
           <button
