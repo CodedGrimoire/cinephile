@@ -50,7 +50,14 @@ export default function MyListPage() {
         watchedMovies: arrayUnion(movie),
       });
       setWatchlist((prev) => prev.filter((m) => m.imdbID !== movie.imdbID));
-      setWatchedMovies((prev) => [...prev, movie]);
+      setWatchedMovies((prev) => {
+        // Check if movie already exists in watched list
+        const exists = prev.some((m) => m.imdbID === movie.imdbID);
+        if (!exists) {
+          return [...prev, movie];
+        }
+        return prev;
+      });
       setToast(`${movie.Title} marked as watched!`);
       setTimeout(() => setToast(null), 2500);
     } catch (err) {
@@ -169,8 +176,8 @@ export default function MyListPage() {
         ) : (
           <div className="relative">
             <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-              {watchlist.map((movie) => (
-                <MovieCard key={movie.imdbID} movie={movie} />
+              {watchlist.map((movie, index) => (
+                <MovieCard key={`watchlist-${movie.imdbID}-${index}`} movie={movie} />
               ))}
             </div>
           </div>
@@ -190,8 +197,8 @@ export default function MyListPage() {
         ) : (
           <div className="relative">
             <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-              {watchedMovies.map((movie) => (
-                <MovieCard key={movie.imdbID} movie={movie} isWatched={true} />
+              {watchedMovies.map((movie, index) => (
+                <MovieCard key={`watched-${movie.imdbID}-${index}`} movie={movie} isWatched={true} />
               ))}
             </div>
           </div>
