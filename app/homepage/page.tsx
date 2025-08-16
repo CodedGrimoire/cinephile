@@ -258,8 +258,18 @@ export default function Homepage() {
                   Genre Based Filtering
                   <span className="group-hover:translate-x-1 transition-transform duration-300">→</span>
                 </button>
+                 <button
+    onClick={() => router.push("/buddy")}
+    className="px-8 py-4 bg-gradient-to-r from-purple-500/80 to-blue-500/80 hover:from-purple-600/90 hover:to-blue-600/90 text-white backdrop-blur-md rounded-2xl border border-white/30 hover:border-white/50 transition-all duration-300 hover:scale-105 shadow-xl hover:shadow-purple-500/25 font-semibold text-lg flex items-center gap-3 group"
+  >
+    <span className="text-xl group-hover:rotate-12 transition-transform duration-300">🎬</span>
+    Ask Movie Buddy
+    <span className="group-hover:translate-x-1 transition-transform duration-300">→</span>
+  </button>
               </div>
+              
             </div>
+            
           </div>
         </div>
 
@@ -342,8 +352,8 @@ export default function Homepage() {
                 {/* Scrollable Movies */}
                 <div className="overflow-x-auto scrollbar-hide pb-4">
                   <div className="flex gap-6 min-w-max px-4">
-                    {featuredMovies.map((movie) => (
-                      <div key={movie.imdbID} className="flex-shrink-0 w-72">
+                    {featuredMovies.map((movie, index) => (
+                      <div key={`${movie.imdbID}-${index}`} className="flex-shrink-0 w-72">
                         <MovieCard
                           movie={movie}
                           onMovieClick={handleMovieClick}
