@@ -11,7 +11,7 @@ export default function HomePage() {
     if (!user) {
       router.push("/login");
     } else {
-      router.push("/homepage"); // if you have a real homepage
+      router.push("/homepage"); 
     }
     setChecking(false);
   }, []);

@@ -52,7 +52,8 @@ export default function MovieCard({
       {showAddButton && (
         <button
           onClick={() => onAddToList(movie)}
-          className="mt-4 px-6 py-2 bg-blue-500/20 text-blue-300 border border-blue-300/50 rounded-full hover:bg-blue-500/30 hover:border-blue-300/70 transition-all duration-300 text-sm font-medium flex items-center justify-center gap-2 mx-auto group"
+          className="mt-4 px-6 py-2 bg-blue-500/20 text-blue-300 border border-blue-300/50 rounded-full hover:bg-blue-500/30 hover:border-blue-300/70 transition-all duration-300 text-sm font-medium flex items-center justify-center gap-2 mx-auto group hover:scale-105
+               transition-all duration-300"
         >
           <span className="text-lg group-hover:scale-110 transition-transform">+</span>
           Add to List

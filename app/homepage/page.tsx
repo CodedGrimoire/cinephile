@@ -318,7 +318,7 @@ export default function Homepage() {
                   className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full border border-white/20 hover:border-white/40 transition-all duration-300 text-white/80 hover:text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Refresh featured movies"
                 >
-                  <span className={`text-sm ${featuredLoading ? 'animate-spin' : ''}`}>🔄</span>
+                  <span className={`text-sm ${featuredLoading ? 'animate-spin' : ''}`}></span>
                   <span className="text-sm">Refresh</span>
                 </button>
               </div>
