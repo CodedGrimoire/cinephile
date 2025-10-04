@@ -23,7 +23,7 @@ export default function LoginPage() {
 
       if (!userSnap.exists()) {
         await setDoc(userRef, {
-          name: user.displayName,
+          displayName: user.displayName,
           email: user.email,
           photoURL: user.photoURL,
           createdAt: new Date(),
