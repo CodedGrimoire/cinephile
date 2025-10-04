@@ -69,7 +69,10 @@ export default function ProfilePage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [movieMatches, setMovieMatches] = useState<{[friendId: string]: Movie[]}>({});
+  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  const [selectedFriendMatches, setSelectedFriendMatches] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [friendsLoading, setFriendsLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const router = useRouter();
 
@@ -88,7 +91,61 @@ export default function ProfilePage() {
   const loadUserData = async (userId: string, userEmail: string) => {
     try {
       setLoading(true);
+ 
+      // Robust validation
+      if (!userId || typeof userId !== "string" || userId.trim() === "") {
+        console.error("Invalid userId for Firestore query:", userId);
+        setLoading(false);
+        return;
+      }
       
+      // Load basic data first (fast)
+      const [userWatchlistDoc, notificationsSnapshot] = await Promise.all([
+        getDoc(doc(db, "watchlists", userId)),
+        userId ? getDocs(query(
+          collection(db, "notifications"),
+          where("userId", "==", userId),
+          orderBy("createdAt", "desc")
+        )) : Promise.resolve({ docs: [] })
+      ]);
+      
+      // Set notifications immediately
+      setNotifications(notificationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification)));
+      
+      // Load friend requests if email available
+      if (userEmail && userEmail.trim() !== "") {
+        try {
+          const requestsQuery = query(
+            collection(db, "friendRequests"),
+            where("toUserEmail", "==", userEmail),
+            where("status", "==", "pending"),
+            orderBy("createdAt", "desc")
+          );
+          const requestsSnapshot = await getDocs(requestsQuery);
+          setFriendRequests(requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FriendRequest)));
+        } catch (error) {
+          console.log("Friend requests query failed, continuing without them");
+          setFriendRequests([]);
+        }
+      }
+      
+      // Set loading to false for basic UI
+      setLoading(false);
+      
+      // Load friends and movie matches in background
+      setFriendsLoading(true);
+      await loadFriendsAndMatches(userId, userWatchlistDoc);
+      setFriendsLoading(false);
+
+    } catch (error) {
+      console.error("Error loading user data:", error);
+      setLoading(false);
+      setFriendsLoading(false);
+    }
+  };
+
+  const loadFriendsAndMatches = async (userId: string, userWatchlistDoc: any) => {
+    try {
       // Load friends
       const friendsQuery = query(
         collection(db, "friends"),
@@ -97,55 +154,47 @@ export default function ProfilePage() {
       const friendsSnapshot = await getDocs(friendsQuery);
       const friendsData: Friend[] = [];
       
-      for (const friendDoc of friendsSnapshot.docs) {
+      // Load friend data in parallel
+      const friendPromises = friendsSnapshot.docs.map(async (friendDoc) => {
         const friendData = friendDoc.data();
-        const friendUserDoc = await getDoc(doc(db, "users", friendData.friendId));
-        if (friendUserDoc.exists()) {
-          const friendUser = friendUserDoc.data();
-          const friendWatchlistDoc = await getDoc(doc(db, "watchlists", friendData.friendId));
-          const friendWatchlist = friendWatchlistDoc.exists() ? friendWatchlistDoc.data() : { movies: [], watchedMovies: [] };
-          
-          friendsData.push({
-            id: friendDoc.id,
-            uid: friendData.friendId,
-            displayName: friendUser.displayName || "Unknown",
-            email: friendUser.email,
-            photoURL: friendUser.photoURL,
-            movies: friendWatchlist.movies || [],
-            watchedMovies: friendWatchlist.watchedMovies || [],
-          });
+        if (friendData.friendId) {
+          try {
+            const [friendUserDoc, friendWatchlistDoc] = await Promise.all([
+              getDoc(doc(db, "users", friendData.friendId)),
+              getDoc(doc(db, "watchlists", friendData.friendId))
+            ]);
+            
+            if (friendUserDoc.exists()) {
+              const friendUser = friendUserDoc.data();
+              const friendWatchlist = friendWatchlistDoc.exists() ? friendWatchlistDoc.data() : { movies: [], watchedMovies: [] };
+              
+              return {
+                id: friendDoc.id,
+                uid: friendData.friendId,
+                displayName: friendUser.displayName || "Unknown",
+                email: friendUser.email,
+                photoURL: friendUser.photoURL,
+                movies: friendWatchlist.movies || [],
+                watchedMovies: friendWatchlist.watchedMovies || [],
+              };
+            }
+          } catch (error) {
+            console.error("Error loading friend data:", error);
+          }
         }
-      }
-      setFriends(friendsData);
-
-      // Load friend requests only if user email is available
-      if (userEmail) {
-        const requestsQuery = query(
-          collection(db, "friendRequests"),
-          where("toUserEmail", "==", userEmail),
-          where("status", "==", "pending"),
-          orderBy("createdAt", "desc")
-        );
-        const requestsSnapshot = await getDocs(requestsQuery);
-        setFriendRequests(requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FriendRequest)));
-      }
-
-      // Load notifications
-      const notificationsQuery = query(
-        collection(db, "notifications"),
-        where("userId", "==", userId),
-        orderBy("createdAt", "desc")
-      );
-      const notificationsSnapshot = await getDocs(notificationsQuery);
-      setNotifications(notificationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification)));
-
+        return null;
+      });
+      
+      const friendsResults = await Promise.all(friendPromises);
+      const validFriends = friendsResults.filter(friend => friend !== null) as Friend[];
+      setFriends(validFriends);
+      
       // Calculate movie matches
-      const userWatchlistDoc = await getDoc(doc(db, "watchlists", userId));
       const userWatchlist = userWatchlistDoc.exists() ? userWatchlistDoc.data() : { movies: [], watchedMovies: [] };
       const userMovies = [...(userWatchlist.movies || []), ...(userWatchlist.watchedMovies || [])];
       
       const matches: {[friendId: string]: Movie[]} = {};
-      friendsData.forEach(friend => {
+      validFriends.forEach(friend => {
         const friendMovies = [...friend.movies, ...friend.watchedMovies];
         const commonMovies = userMovies.filter(userMovie => 
           friendMovies.some(friendMovie => friendMovie.imdbID === userMovie.imdbID)
@@ -153,48 +202,47 @@ export default function ProfilePage() {
         matches[friend.uid] = commonMovies;
       });
       setMovieMatches(matches);
-
+      
     } catch (error) {
-      console.error("Error loading user data:", error);
-    } finally {
-      setLoading(false);
+      console.error("Error loading friends and matches:", error);
     }
   };
-
   const sendFriendRequest = async () => {
     if (!inviteEmail || !user) return;
-    
+  
     try {
-      // Check if user exists with this email
+      // 🔎 Look up user by email
       const usersQuery = query(
         collection(db, "users"),
         where("email", "==", inviteEmail)
       );
       const usersSnapshot = await getDocs(usersQuery);
-      
+  
       if (usersSnapshot.empty) {
         setToast("No user found with this email address");
         setTimeout(() => setToast(null), 3000);
         return;
       }
-
-      const targetUser = usersSnapshot.docs[0].data();
-      
-      // Check if already friends
+  
+      // ✅ Fix: use Firestore doc.id as UID (not targetUser.uid)
+      const targetUserDoc = usersSnapshot.docs[0];
+      const targetUser = { id: targetUserDoc.id, ...targetUserDoc.data() };
+  
+      // 🔎 Check if already friends
       const existingFriendQuery = query(
         collection(db, "friends"),
         where("userId", "==", user.uid),
-        where("friendId", "==", targetUser.uid)
+        where("friendId", "==", targetUser.id)
       );
       const existingFriendSnapshot = await getDocs(existingFriendQuery);
-      
+  
       if (!existingFriendSnapshot.empty) {
         setToast("You are already friends with this user");
         setTimeout(() => setToast(null), 3000);
         return;
       }
-
-      // Check if request already exists
+  
+      // 🔎 Check if request already exists
       const existingRequestQuery = query(
         collection(db, "friendRequests"),
         where("fromUserId", "==", user.uid),
@@ -202,14 +250,14 @@ export default function ProfilePage() {
         where("status", "==", "pending")
       );
       const existingRequestSnapshot = await getDocs(existingRequestQuery);
-      
+  
       if (!existingRequestSnapshot.empty) {
         setToast("Friend request already sent");
         setTimeout(() => setToast(null), 3000);
         return;
       }
-
-      // Create friend request
+  
+      // ✅ Create friend request
       await addDoc(collection(db, "friendRequests"), {
         fromUserId: user.uid,
         fromUserEmail: user.email,
@@ -218,10 +266,10 @@ export default function ProfilePage() {
         status: "pending",
         createdAt: serverTimestamp(),
       });
-
-      // Create notification for target user
+  
+      // ✅ Create notification for recipient (targetUser.id instead of uid)
       await addDoc(collection(db, "notifications"), {
-        userId: targetUser.uid,
+        userId: targetUser.id,
         type: "friend_request",
         title: "New Friend Request",
         message: `${user.displayName || user.email} wants to be your friend`,
@@ -230,7 +278,7 @@ export default function ProfilePage() {
         isRead: false,
         createdAt: serverTimestamp(),
       });
-
+  
       setToast("Friend request sent successfully!");
       setInviteEmail("");
       setTimeout(() => setToast(null), 3000);
@@ -240,7 +288,7 @@ export default function ProfilePage() {
       setTimeout(() => setToast(null), 3000);
     }
   };
-
+  
   const respondToFriendRequest = async (requestId: string, accepted: boolean) => {
     try {
       const request = friendRequests.find(r => r.id === requestId);
@@ -283,8 +331,8 @@ export default function ProfilePage() {
       setToast(accepted ? "Friend request accepted!" : "Friend request declined");
       setTimeout(() => setToast(null), 3000);
 
-      // Reload friends list
-      await loadUserData(user.uid, user.email || "");
+      // Reload friends list in background
+      loadFriendsAndMatches(user.uid, await getDoc(doc(db, "watchlists", user.uid)));
     } catch (error) {
       console.error("Error responding to friend request:", error);
       setToast("Error processing friend request");
@@ -305,10 +353,29 @@ export default function ProfilePage() {
     }
   };
 
+  const handleFriendClick = (friend: Friend) => {
+    setSelectedFriend(friend);
+    setSelectedFriendMatches(movieMatches[friend.uid] || []);
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div 
+        className="min-h-screen flex items-center justify-center"
+        style={{
+          backgroundImage:
+            "url('https://media.tenor.com/EtE11qgEtLIAAAAM/art-starry-night.gif')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed",
+        }}
+      >
+        <div className="backdrop-blur-lg bg-white/10 border border-white/30 shadow-2xl rounded-2xl p-8 text-white text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-xl font-semibold">Loading your profile...</p>
+          <p className="text-white/70 text-sm mt-2">Setting up your friends and movie matches</p>
+        </div>
       </div>
     );
   }
@@ -355,47 +422,39 @@ export default function ProfilePage() {
           {/* Friends List Section */}
           <div className="backdrop-blur-lg bg-white/10 border border-white/30 shadow-2xl rounded-2xl p-6 text-white">
             <h2 className="text-2xl font-bold mb-4">My Friends ({friends.length})</h2>
-            {friends.length === 0 ? (
+            {friendsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mr-3"></div>
+                <p className="text-white/70">Loading friends and movie matches...</p>
+              </div>
+            ) : friends.length === 0 ? (
               <p className="text-white/70">No friends yet. Send some invites!</p>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                <p className="text-white/60 text-xs mb-3 px-1">💡 Click to view movie matches</p>
                 {friends.map((friend) => (
-                  <div key={friend.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <img
-                        src={friend.photoURL || "/globe.svg"}
-                        alt={friend.displayName}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                      <div>
-                        <p className="font-semibold">{friend.displayName}</p>
-                        <p className="text-white/60 text-sm">{friend.email}</p>
-                        {movieMatches[friend.uid] && movieMatches[friend.uid].length > 0 && (
-                          <p className="text-green-400 text-xs">
-                            {movieMatches[friend.uid].length} movie matches
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                  <div 
+                    key={friend.id} 
+                    className={`p-3 rounded-lg cursor-pointer transition-all duration-300 transform ${
+                      selectedFriend?.uid === friend.uid 
+                        ? 'bg-blue-500/30 border-2 border-blue-400 shadow-lg shadow-blue-500/20 scale-105' 
+                        : 'bg-white/5 hover:bg-white/20 hover:scale-102 hover:shadow-lg hover:shadow-white/10 border border-transparent hover:border-white/20'
+                    }`}
+                    onClick={() => handleFriendClick(friend)}
+                  >
+                    <p className="text-white font-medium">{friend.email}</p>
                     {movieMatches[friend.uid] && movieMatches[friend.uid].length > 0 && (
-                      <div className="text-right">
-                        <div className="text-xs text-white/60">Common Movies:</div>
-                        <div className="text-xs text-green-400">
-                          {movieMatches[friend.uid].slice(0, 2).map(movie => movie.Title).join(", ")}
-                          {movieMatches[friend.uid].length > 2 && "..."}
-                        </div>
-                      </div>
+                      <p className="text-green-400 text-xs mt-1">
+                        {movieMatches[friend.uid].length} movie matches
+                      </p>
                     )}
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
 
-        {/* Right Side */}
-        <div className="space-y-6">
-          {/* Send Invites Section */}
+          {/* Send Friend Invite Section */}
           <div className="backdrop-blur-lg bg-white/10 border border-white/30 shadow-2xl rounded-2xl p-6 text-white">
             <h2 className="text-2xl font-bold mb-4">Send Friend Invite</h2>
             <div className="space-y-4">
@@ -418,20 +477,19 @@ export default function ProfilePage() {
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Notifications Section */}
-          <div className="backdrop-blur-lg bg-white/10 border border-white/30 shadow-2xl rounded-2xl p-6 text-white">
-            <h2 className="text-2xl font-bold mb-4">Notifications ({notifications.filter(n => !n.isRead).length})</h2>
-            {notifications.length === 0 ? (
-              <p className="text-white/70">No notifications</p>
-            ) : (
+        {/* Right Side */}
+        <div className="space-y-6">
+          {/* Notifications Section - Only show if there are unread notifications */}
+          {notifications.filter(n => !n.isRead).length > 0 && (
+            <div className="backdrop-blur-lg bg-white/10 border border-white/30 shadow-2xl rounded-2xl p-6 text-white">
+              <h2 className="text-2xl font-bold mb-4">Notifications ({notifications.filter(n => !n.isRead).length})</h2>
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {notifications.map((notification) => (
+                {notifications.filter(n => !n.isRead).map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-3 rounded-lg cursor-pointer transition ${
-                      notification.isRead ? 'bg-white/5' : 'bg-blue-500/10 border border-blue-300/30'
-                    }`}
+                    className="p-3 rounded-lg cursor-pointer transition bg-blue-500/10 border border-blue-300/30"
                     onClick={() => markNotificationAsRead(notification.id)}
                   >
                     <div className="flex justify-between items-start">
@@ -444,15 +502,52 @@ export default function ProfilePage() {
                           </p>
                         )}
                       </div>
-                      {!notification.isRead && (
-                        <div className="w-2 h-2 bg-blue-400 rounded-full ml-2"></div>
-                      )}
+                      <div className="w-2 h-2 bg-blue-400 rounded-full ml-2"></div>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Selected Friend Movie Matches */}
+          {selectedFriend && (
+            <div className="backdrop-blur-lg bg-white/10 border border-white/30 shadow-2xl rounded-2xl p-6 text-white">
+              <h2 className="text-2xl font-bold mb-4">🎬 Movie Matches with {selectedFriend.email}</h2>
+              {selectedFriendMatches.length > 0 ? (
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedFriendMatches.map((movie) => (
+                      <div key={movie.imdbID} className="bg-white/5 rounded-lg p-3">
+                        <img
+                          src={movie.Poster !== "N/A" ? movie.Poster : "/placeholder.png"}
+                          alt={movie.Title}
+                          className="w-full h-24 object-cover rounded mb-2"
+                        />
+                        <p className="text-white text-sm font-medium truncate">{movie.Title}</p>
+                        <p className="text-white/60 text-xs">{movie.Year}</p>
+                        {movie.Genre && (
+                          <p className="text-white/50 text-xs truncate">{movie.Genre}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-green-400 text-sm font-medium">
+                      🎭 {selectedFriendMatches.length} common movies
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-white/70 text-lg">No movie matches yet</p>
+                  <p className="text-white/50 text-sm mt-2">
+                    Add some movies to your watchlist to find common interests!
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Friend Requests Section */}
           {friendRequests.length > 0 && (
@@ -487,3 +582,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
