@@ -1,6 +1,5 @@
 // components/FeaturedMoviesFetcher.ts
 import axios from "axios";
-import { dhakaDate } from "@/lib/cinemas/calendar";
 
 export interface Movie {
   Title: string;
@@ -15,20 +14,8 @@ export interface Movie {
   [key: string]: string | number | boolean | undefined;
 }
 
-export type ReleaseCatalogueMovie = {
-  providerMovieId: string;
-  title: string;
-  releaseDate: string;
-};
-
-type CatalogueResponse = { state?: string; data?: ReleaseCatalogueMovie[] };
-
-const normalizeTitle = (value: string) => value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-
 export class FeaturedMoviesFetcher {
   private apikey = "https://www.omdbapi.com/?apikey=a4d5b9";
-  private releaseCatalogueCache: { expiresAt: number; movies: ReleaseCatalogueMovie[] } | null = null;
-  private releaseCatalogueRequest: Promise<ReleaseCatalogueMovie[]> | null = null;
 
   // Curated lists of high-rated recent movies (2020-2025) by genre - NO DUPLICATES
   private genreMovies = {
@@ -238,84 +225,6 @@ export class FeaturedMoviesFetcher {
     return movies;
   }
 
-  // Method to get movies from a specific year
-  public async getMoviesByYear(year: number, minRating: number = 7.5, count: number = 10): Promise<Movie[]> {
-    const today = dhakaDate();
-    const catalogue = await this.getReleaseCatalogue();
-    const candidates = catalogue.filter((movie) => movie.releaseDate.startsWith(`${year}-`) && movie.releaseDate <= today);
-    const detailed = await this.enrichCatalogue(candidates);
-    return detailed
-      .filter((movie): movie is Movie => movie !== null && movie.imdbRating !== undefined && Number(movie.imdbRating) >= minRating)
-      .sort((a, b) => Number(b.imdbRating) - Number(a.imdbRating) || a.Title.localeCompare(b.Title))
-      .slice(0, count);
-  }
-
-  public async getUpcomingMovies(count: number = 10): Promise<Array<ReleaseCatalogueMovie & { details?: Movie }>> {
-    const today = dhakaDate();
-    const catalogue = await this.getReleaseCatalogue();
-    const upcoming = catalogue.filter((movie) => movie.releaseDate > today)
-      .sort((a, b) => a.releaseDate.localeCompare(b.releaseDate) || a.title.localeCompare(b.title))
-      .slice(0, count);
-    const enriched = await this.enrichCatalogue(upcoming);
-    return upcoming.map((movie, index) => ({ ...movie, ...(enriched[index] ? { details: enriched[index]! } : {}) }));
-  }
-
-  private async getReleaseCatalogue(): Promise<ReleaseCatalogueMovie[]> {
-    if (this.releaseCatalogueCache && this.releaseCatalogueCache.expiresAt > Date.now()) return this.releaseCatalogueCache.movies;
-    if (this.releaseCatalogueRequest) return this.releaseCatalogueRequest;
-    this.releaseCatalogueRequest = (async () => {
-      const response = await fetch("/api/cinemas/movies", { cache: "no-store" });
-      if (!response.ok) throw new Error(`Star Cineplex catalogue request failed (${response.status}).`);
-      const body = await response.json() as CatalogueResponse;
-      if (body.state !== "available" || !Array.isArray(body.data)) {
-        throw new Error("Star Cineplex release catalogue is currently unavailable.");
-      }
-      const movies = body.data.filter((movie): movie is ReleaseCatalogueMovie =>
-        typeof movie?.providerMovieId === "string" && typeof movie.title === "string" &&
-        typeof movie.releaseDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(movie.releaseDate));
-      this.releaseCatalogueCache = { expiresAt: Date.now() + 10 * 60 * 1000, movies };
-      return movies;
-    })();
-    try {
-      return await this.releaseCatalogueRequest;
-    } finally {
-      this.releaseCatalogueRequest = null;
-    }
-  }
-
-  private async enrichCatalogue(candidates: ReleaseCatalogueMovie[]): Promise<Array<Movie | null>> {
-    const results: Array<Movie | null> = [];
-    for (let offset = 0; offset < candidates.length; offset += 4) {
-      const batch = candidates.slice(offset, offset + 4);
-      results.push(...await Promise.all(batch.map((candidate) => this.fetchMovieByTitle(candidate))));
-    }
-    return results;
-  }
-
-  private async fetchMovieByTitle(candidate: ReleaseCatalogueMovie): Promise<Movie | null> {
-    try {
-      const year = candidate.releaseDate.slice(0, 4);
-      const { data } = await axios.get<Record<string, unknown>>(`${this.apikey}&t=${encodeURIComponent(candidate.title)}&y=${year}&plot=short`);
-      if (data.Response !== "True" || typeof data.imdbID !== "string" || !/^tt\d+$/.test(data.imdbID) ||
-        typeof data.Title !== "string" || normalizeTitle(data.Title) !== normalizeTitle(candidate.title) ||
-        typeof data.Year !== "string" || !data.Year.startsWith(year)) return null;
-      return {
-        Title: data.Title,
-        Year: data.Year,
-        imdbID: data.imdbID,
-        Type: typeof data.Type === "string" ? data.Type : "movie",
-        Poster: typeof data.Poster === "string" ? data.Poster : "N/A",
-        imdbRating: typeof data.imdbRating === "string" && data.imdbRating !== "N/A" ? data.imdbRating : undefined,
-        Actors: typeof data.Actors === "string" ? data.Actors : undefined,
-        Genre: typeof data.Genre === "string" ? data.Genre : undefined,
-        Plot: typeof data.Plot === "string" ? data.Plot : undefined,
-      };
-    } catch (error) {
-      console.error(`Unable to match ${candidate.title} in OMDb:`, error);
-      return null;
-    }
-  }
-
   // Method to refresh featured movies
   public async refreshFeaturedMovies(count: number = 8): Promise<Movie[]> {
     return this.getFeaturedMovies(count);
@@ -329,8 +238,6 @@ export const featuredMoviesFetcher = new FeaturedMoviesFetcher();
 export const useFeaturedMovies = () => {
   return {
     getFeaturedMovies: (count?: number) => featuredMoviesFetcher.getFeaturedMovies(count),
-    getMoviesByYear: (year: number, minRating?: number, count?: number) => 
-      featuredMoviesFetcher.getMoviesByYear(year, minRating, count),
     refreshFeaturedMovies: (count?: number) => featuredMoviesFetcher.refreshFeaturedMovies(count),
   };
 };

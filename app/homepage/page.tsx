@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import SearchBar from "../components/search";
 import MovieCard from "../components/MovieCard";
 import MovieModal from "../components/MovieModal";
-import MovieDiscoverySections from "../components/MovieDiscoverySections";
 import UserDropdown from "../components/UserDropdown";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { featuredMoviesFetcher } from "../components/FeaturedMoviesFetcher";
@@ -12,7 +11,7 @@ import { useRouter } from "next/navigation";
 
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app, db } from "@/firebaseConfig";
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, setDoc, arrayUnion } from "firebase/firestore";
 import { dhakaDate } from "@/lib/cinemas/calendar";
 
 interface Movie {
@@ -42,6 +41,7 @@ export default function Homepage() {
   // State variables
   const [photoURL, setPhotoURL] = useState<string | null>(null);
   const [addedMessage, setAddedMessage] = useState<string | null>(null);
+  const [addErrorMessage, setAddErrorMessage] = useState<string | null>(null);
   const [s, setS] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
   const [featuredMovies, setFeaturedMovies] = useState<Movie[]>([]);
@@ -113,7 +113,7 @@ export default function Homepage() {
           const uniqueMatches = [...currentYearMatches, ...regularMatches].filter((movie, index, all) =>
             all.findIndex((candidate) => candidate.imdbID === movie.imdbID) === index
           );
-          const detailedResults = await Promise.all(uniqueMatches.map((movie) => fetchMovieDetails(movie)));
+          const detailedResults = await Promise.all(uniqueMatches.slice(0, 20).map((movie) => fetchMovieDetails(movie)));
           setResults(detailedResults);
         } catch (error: unknown) {
           console.error("Error fetching data:", error);
@@ -125,22 +125,31 @@ export default function Homepage() {
   };
 
   const addToList = async (movie: Movie) => {
-    if (!userId) return;
-    const userDoc = doc(db, "watchlists", userId);
+    const activeUserId = getAuth(app).currentUser?.uid ?? userId;
+    if (!activeUserId) {
+      setAddErrorMessage("Sign in to add movies to your watchlist.");
+      setTimeout(() => setAddErrorMessage(null), 3500);
+      return;
+    }
+    if (!movie.imdbID || !movie.Title) {
+      setAddErrorMessage("This movie is missing its title or IMDb identifier and couldn’t be added.");
+      setTimeout(() => setAddErrorMessage(null), 3500);
+      return;
+    }
+    const userDoc = doc(db, "watchlists", activeUserId);
+    const firestoreMovie = Object.fromEntries(
+      Object.entries(movie).filter(([, value]) => value !== undefined)
+    ) as Movie;
 
     try {
-      const snapshot = await getDoc(userDoc);
-      if (!snapshot.exists()) {
-        await setDoc(userDoc, { movies: [movie] });
-      } else {
-        await updateDoc(userDoc, {
-          movies: arrayUnion(movie),
-        });
-      }
+      await setDoc(userDoc, { movies: arrayUnion(firestoreMovie) }, { merge: true });
+      setAddErrorMessage(null);
       setAddedMessage(`${movie.Title} has been added to your list.`);
       setTimeout(() => setAddedMessage(null), 2500);
     } catch (error) {
       console.error("Error saving to Firestore:", error);
+      setAddErrorMessage("Couldn’t save this movie. Please check your sign-in and try again.");
+      setTimeout(() => setAddErrorMessage(null), 4000);
     }
   };
 
@@ -231,6 +240,11 @@ export default function Homepage() {
             <span className="text-xl">✨</span>
             <span className="font-medium">{addedMessage}</span>
           </div>
+        </div>
+      )}
+      {addErrorMessage && (
+        <div role="alert" className="fixed top-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl border border-rose-200/30 bg-rose-950/90 px-6 py-4 text-white shadow-2xl">
+          {addErrorMessage}
         </div>
       )}
 
@@ -326,8 +340,6 @@ export default function Homepage() {
             </div>
           </div>
         )}
-
-        <MovieDiscoverySections onMovieClick={handleMovieClick} onAddToList={addToList} />
 
         {/* Featured Movies Section - Horizontal Scrollable with Dynamic Content */}
         <div className="w-full max-w-7xl mx-auto mb-16">
