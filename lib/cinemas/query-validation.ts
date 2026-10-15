@@ -1,5 +1,6 @@
 export type ShowtimeQuery = { movie: string; date: string };
 export type ShowtimeQueryValidation = { valid: true; value: ShowtimeQuery } | { valid: false; message: string };
+export type ScheduleDateValidation = { valid: true; value: string } | { valid: false; message: string };
 
 function validDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -17,4 +18,12 @@ export function validateShowtimeQuery(movieValue: string | null, dateValue: stri
     return { valid: false, message: "date is required and must be a real date in YYYY-MM-DD format." };
   }
   return { valid: true, value: { movie, date } };
+}
+
+export function validateScheduleDate(dateValue: string | null): ScheduleDateValidation {
+  const date = dateValue?.trim();
+  if (!date || !validDate(date)) {
+    return { valid: false, message: "date is required and must be a real date in YYYY-MM-DD format." };
+  }
+  return { valid: true, value: date };
 }

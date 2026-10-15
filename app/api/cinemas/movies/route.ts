@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cacheable, movieListCache, withStaleMetadata } from "@/lib/cinemas/route-cache";
 import { starCineplexProvider } from "@/lib/cinemas/star-cineplex";
+import { STAR_CINEPLEX_CAPABILITIES } from "@/lib/cinemas/types";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,11 @@ export async function GET() {
   } catch {
     return NextResponse.json({
       state: "provider_error",
+      availabilityState: "provider_unavailable",
+      capability: "catalogue",
+      capabilities: STAR_CINEPLEX_CAPABILITIES,
+      freshness: "not_retrieved",
+      matchConfidence: "not_applicable",
       message: "Movie listings could not be retrieved from Star Cineplex.",
       source: { provider: "star-cineplex", sourceUrl: "https://starcineplex.com/movies?status=now-showing", checkedAt: new Date().toISOString(), mode: "provider-feed" },
     }, { status: 502, headers: { "Cache-Control": "no-store" } });

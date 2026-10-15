@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useEffect, useReducer, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/firebaseConfig";
 import { doc, getDoc, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore";
-import CinemaShowtimes from "@/app/components/CinemaShowtimes";
-import { cinemaMovieProps, initialWishlistCinemaPanelState, wishlistCinemaPanelReducer } from "@/lib/cinemas/wishlist-panel";
+import CineplexAvailability from "@/app/components/CineplexAvailability";
 
 interface Movie {
   imdbID: string;
@@ -24,13 +23,7 @@ export default function MyListPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [modalMovie, setModalMovie] = useState<Movie | null>(null);
-  const [cinemaPanel, dispatchCinemaPanel] = useReducer(wishlistCinemaPanelReducer, initialWishlistCinemaPanelState);
-  const cinemaTriggerRef = useRef<HTMLButtonElement | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    if (!cinemaPanel.selectedMovie) cinemaTriggerRef.current?.focus();
-  }, [cinemaPanel.selectedMovie]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -146,21 +139,6 @@ export default function MyListPage() {
             Remove
           </button>
         )}
-        {!isWatched && (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              cinemaTriggerRef.current = event.currentTarget;
-              setModalMovie(null);
-              dispatchCinemaPanel({ type: "open", movie });
-            }}
-            className="w-full rounded-full border border-cyan-200/35 bg-cyan-400/10 px-3 py-2 text-sm text-cyan-100 transition hover:bg-cyan-400/20 focus:outline-none focus:ring-2 focus:ring-cyan-300"
-            aria-label={`Show Star Cineplex times for ${movie.Title}`}
-          >
-            Cinema Showtimes
-          </button>
-        )}
       </div>
     </article>
   );
@@ -187,6 +165,8 @@ export default function MyListPage() {
         <h1 className="text-white text-3xl font-bold mb-6 drop-shadow-xl">
           My Watchlist
         </h1>
+
+        <CineplexAvailability watchlist={watchlist} />
 
         {watchlist.length === 0 ? (
           <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-8 text-center">
@@ -257,14 +237,6 @@ export default function MyListPage() {
             </button>
           </div>
         </div>
-      )}
-
-      {cinemaPanel.selectedMovie && (
-        <CinemaShowtimes
-          key={cinemaPanel.selectedMovie.imdbID}
-          movie={cinemaMovieProps(cinemaPanel.selectedMovie)}
-          onClose={() => dispatchCinemaPanel({ type: "close" })}
-        />
       )}
 
       <style jsx global>{`

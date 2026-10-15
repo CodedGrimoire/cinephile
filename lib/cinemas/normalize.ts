@@ -4,6 +4,8 @@ import { dateInTimezone } from "./calendar";
 export type NormalizationContext = {
   movieId: string;
   movieTitle: string;
+  movieImdbId?: string;
+  movieReleaseYear?: number;
   cinemaId: string;
   cinemaName: string;
   date: string;
@@ -49,7 +51,7 @@ function officialBookingUrl(value: unknown): string | undefined {
 
 /** Normalize a canonical, permitted provider feed response. This is not a parser for the undocumented ticket API. */
 export function normalizeShowtimes(payload: unknown, context: NormalizationContext): {
-  state: "currently_showing" | "no_matching_screenings";
+  state: "screening_scheduled" | "confirmed_no_screenings";
   screenings: Showtime[];
 } {
   const envelope = asRecord(payload);
@@ -68,22 +70,26 @@ export function normalizeShowtimes(payload: unknown, context: NormalizationConte
       ? { amount: priceAmount, currency: "BDT" as const }
       : undefined;
     const remaining = row.seatsRemaining;
+    const availability = availabilityOf(row.availability);
     screenings.push({
       id: row.id,
       movieId: context.movieId,
       movieTitle: context.movieTitle,
+      ...(context.movieImdbId ? { movieImdbId: context.movieImdbId } : {}),
+      ...(context.movieReleaseYear && Number.isInteger(context.movieReleaseYear) ? { movieReleaseYear: context.movieReleaseYear } : {}),
       cinemaId: context.cinemaId,
       cinemaName: context.cinemaName,
       date: context.date,
       startsAt: startsAt.toISOString(),
       format: formatOf(row.format),
-      availability: availabilityOf(row.availability),
+      availability,
+      availabilityState: availability === "sold_out" ? "sold_out" : availability === "unknown" ? "availability_unknown" : "seats_available",
       ...(price ? { price } : {}),
       ...(typeof remaining === "number" && Number.isInteger(remaining) && remaining >= 0 ? { seatsRemaining: remaining } : {}),
       ...(officialBookingUrl(row.bookingUrl) ? { officialBookingUrl: officialBookingUrl(row.bookingUrl) } : {}),
     });
   }
-  return { state: screenings.length ? "currently_showing" : "no_matching_screenings", screenings };
+  return { state: screenings.length ? "screening_scheduled" : "confirmed_no_screenings", screenings };
 }
 
 export function safeProviderError(): { state: "provider_error"; message: string } {

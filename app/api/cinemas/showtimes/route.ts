@@ -1,32 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { showtimeCache, withStaleMetadata } from "@/lib/cinemas/route-cache";
-import { validateShowtimeQuery } from "@/lib/cinemas/query-validation";
+import { cacheableShowtimeSchedule, showtimeCache, withStaleMetadata } from "@/lib/cinemas/route-cache";
+import { validateScheduleDate, validateShowtimeQuery } from "@/lib/cinemas/query-validation";
 import { starCineplexProvider } from "@/lib/cinemas/star-cineplex";
+import { STAR_CINEPLEX_CAPABILITIES } from "@/lib/cinemas/types";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const validation = validateShowtimeQuery(
-    request.nextUrl.searchParams.get("movie"),
-    request.nextUrl.searchParams.get("date"),
-  );
-  if (!validation.valid) {
-    return NextResponse.json({ state: "invalid_request", message: validation.message }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  const movieQuery = request.nextUrl.searchParams.get("movie");
+  const dateQuery = request.nextUrl.searchParams.get("date");
+  const dateValidation = validateScheduleDate(dateQuery);
+  const movieValidation = request.nextUrl.searchParams.has("movie")
+    ? validateShowtimeQuery(movieQuery, dateQuery)
+    : null;
+  if (!dateValidation.valid || (movieValidation && !movieValidation.valid)) {
+    const message = !dateValidation.valid ? dateValidation.message : movieValidation && !movieValidation.valid ? movieValidation.message : "Invalid request.";
+    return NextResponse.json({ state: "invalid_request", message }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
-  const { movie, date } = validation.value;
+  const date = dateValidation.value;
+  const movie = movieValidation?.valid ? movieValidation.value.movie : undefined;
 
   try {
-    const cacheKey = `star-cineplex:showtimes:${movie.toLocaleLowerCase("en")}:${date}`;
-    const cached = await showtimeCache.get(cacheKey, () => starCineplexProvider.getShowtimes(movie, date), (result) => result.state === "available");
+    const cacheKey = movie
+      ? `star-cineplex:showtimes:${movie.toLocaleLowerCase("en")}:${date}`
+      : `star-cineplex:showtimes:all:${date}`;
+    const loader = () => movie
+      ? starCineplexProvider.getShowtimes(movie, date)
+      : starCineplexProvider.getDailySchedule(date);
+    const cached = await showtimeCache.get(cacheKey, loader, cacheableShowtimeSchedule);
     const result = withStaleMetadata(cached.value, cached.stale);
     const status = result.state === "available" ? 200 : result.state === "unavailable" ? 503 : 502;
+    const mayCache = cacheableShowtimeSchedule(result);
     return NextResponse.json(result, {
       status,
-      headers: { "Cache-Control": result.state === "available" ? "public, s-maxage=720, stale-while-revalidate=1800" : "no-store" },
+      headers: { "Cache-Control": mayCache ? "public, s-maxage=720, stale-while-revalidate=1800" : "no-store" },
     });
   } catch {
     return NextResponse.json({
       state: "provider_error",
+      availabilityState: "provider_unavailable",
+      capability: "showtimes",
+      capabilities: STAR_CINEPLEX_CAPABILITIES,
+      freshness: "not_retrieved",
+      matchConfidence: "not_applicable",
       message: "Showtimes could not be retrieved from Star Cineplex.",
       source: { provider: "star-cineplex", sourceUrl: "https://starcineplex.com/showtimes", checkedAt: new Date().toISOString(), mode: "provider-feed" },
     }, { status: 502, headers: { "Cache-Control": "no-store" } });

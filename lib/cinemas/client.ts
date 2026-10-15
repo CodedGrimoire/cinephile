@@ -5,7 +5,7 @@ export { addCalendarDays, dhakaDate, formatDhakaDateTime, formatDhakaTime } from
 import type { MovieMatch } from "./matching";
 
 export type ShowtimeListing = {
-  state: "currently_showing" | "no_matching_screenings";
+  state: "screening_scheduled" | "confirmed_no_screenings" | "currently_showing" | "no_matching_screenings";
   screenings: Showtime[];
 };
 
@@ -55,13 +55,17 @@ function isShowtime(value: unknown): value is Showtime {
     Number.isInteger(item.seatsRemaining) && item.seatsRemaining >= 0);
   const validBookingUrl = item?.officialBookingUrl === undefined || (typeof item.officialBookingUrl === "string" &&
     safeBookingUrl(item.officialBookingUrl) === item.officialBookingUrl);
+  const validAvailabilityState = item?.availabilityState === undefined ||
+    ["availability_unknown", "seats_available", "sold_out"].includes(String(item.availabilityState));
   const startsAt = typeof item?.startsAt === "string" ? new Date(item.startsAt) : null;
   return typeof item?.id === "string" && typeof item.movieId === "string" && typeof item.movieTitle === "string" &&
+    (item.movieImdbId === undefined || typeof item.movieImdbId === "string" && /^tt\d+$/.test(item.movieImdbId)) &&
+    (item.movieReleaseYear === undefined || typeof item.movieReleaseYear === "number" && Number.isInteger(item.movieReleaseYear)) &&
     typeof item.cinemaId === "string" && typeof item.cinemaName === "string" && typeof item.date === "string" &&
     /^\d{4}-\d{2}-\d{2}$/.test(item.date) && startsAt !== null && Number.isFinite(startsAt.getTime()) &&
     dateInTimezone(startsAt, "Asia/Dhaka") === item.date && typeof item.format === "string" &&
     ["2D", "3D", "IMAX", "ATMOS", "UNKNOWN"].includes(item.format) &&
-    ["available", "limited", "sold_out", "unknown"].includes(String(item.availability)) && validPrice && validSeats && validBookingUrl;
+    ["available", "limited", "sold_out", "unknown"].includes(String(item.availability)) && validPrice && validSeats && validBookingUrl && validAvailabilityState;
 }
 
 async function readResponse<T>(
@@ -120,14 +124,21 @@ export class CinemaApiClient {
 
   async getShowtimes(movie: string, date: string, signal?: AbortSignal): Promise<CinemaClientResult<ShowtimeListing>> {
     const query = new URLSearchParams({ movie, date });
-    return this.request(`/api/cinemas/showtimes?${query.toString()}`, signal, (body) => {
+    return this.request(`/api/cinemas/showtimes?${query.toString()}`, signal, this.showtimeListing);
+  }
+
+  async getDailyShowtimes(date: string, signal?: AbortSignal): Promise<CinemaClientResult<ShowtimeListing>> {
+    const query = new URLSearchParams({ date });
+    return this.request(`/api/cinemas/showtimes?${query.toString()}`, signal, this.showtimeListing);
+  }
+
+  private showtimeListing(body: unknown): { data: ShowtimeListing; source: SourceMetadata } | null {
       const payload = record(body);
       if (payload?.state !== "available" || !sourceOf(payload.source)) return null;
       const data = record(payload.data);
-      if (!data || (data.state !== "currently_showing" && data.state !== "no_matching_screenings") ||
+      if (!data || !["screening_scheduled", "confirmed_no_screenings", "currently_showing", "no_matching_screenings"].includes(String(data.state)) ||
         !Array.isArray(data.screenings) || !data.screenings.every(isShowtime)) return null;
       return { data: data as ShowtimeListing, source: payload.source };
-    });
   }
 
   matchMovie(movie: { imdbID: string; Title: string; Year: string }, providerMovies: CinemaMovie[]) {

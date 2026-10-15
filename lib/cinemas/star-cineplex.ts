@@ -1,4 +1,4 @@
-import type { CinemaLocation, CinemaMovie, ProviderResult, ShowtimeResult } from "./types";
+import { STAR_CINEPLEX_CAPABILITIES, type CinemaLocation, type CinemaMovie, type ProviderResult, type ShowtimeResult } from "./types";
 
 const OFFICIAL_ROOT = "https://starcineplex.com";
 const DIRECTORY_SNAPSHOT_DATE = "2026-10-15T00:00:00.000Z";
@@ -33,23 +33,38 @@ export class StarCineplexProvider {
   async getLocations(): Promise<ProviderResult<CinemaLocation[]>> {
     return {
       state: "available",
+      availabilityState: "data_available",
+      capability: "branches",
+      capabilities: { ...STAR_CINEPLEX_CAPABILITIES },
+      freshness: "dated_snapshot",
+      matchConfidence: "not_applicable",
+      retrievedAt: DIRECTORY_SNAPSHOT_DATE,
       data: BRANCHES.map((branch) => ({ ...branch })),
       source: metadata("official-public-directory", `${OFFICIAL_ROOT}/branches`),
     };
   }
 
   async getMovies(): Promise<ProviderResult<CinemaMovie[]>> {
-    return this.unavailable(`${OFFICIAL_ROOT}/movies?status=now-showing`);
+    return this.unavailable("catalogue", "provider_unavailable", `${OFFICIAL_ROOT}/movies?status=now-showing`);
   }
 
   async getShowtimes(_movie: string, _date: string): Promise<ShowtimeResult> {
-    return this.unavailable(`${OFFICIAL_ROOT}/showtimes`);
+    return this.unavailable("showtimes", "provider_unavailable", `${OFFICIAL_ROOT}/showtimes`);
   }
 
-  private unavailable<T>(sourceUrl: string): ProviderResult<T> {
+  async getDailySchedule(_date: string): Promise<ShowtimeResult> {
+    return this.unavailable("showtimes", "provider_unavailable", `${OFFICIAL_ROOT}/showtimes`);
+  }
+
+  private unavailable<T>(capability: string, availabilityState: "provider_unavailable" | "data_unavailable", sourceUrl: string): ProviderResult<T> {
     return {
       state: "unavailable",
-      message: "No verified, authorized public Star Cineplex schedule feed is configured.",
+      availabilityState,
+      capability,
+      capabilities: { ...STAR_CINEPLEX_CAPABILITIES },
+      freshness: "not_retrieved",
+      matchConfidence: "not_applicable",
+      message: "No verified, authorized Star Cineplex data feed is configured for this capability.",
       source: metadata("provider-feed", sourceUrl),
     };
   }

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BoundedAsyncCache } from "../lib/cinemas/cache";
+import { cacheableShowtimeSchedule } from "../lib/cinemas/route-cache";
 import { matchMovieTitle } from "../lib/cinemas/matching";
+import { matchScreeningToWatchlist } from "../lib/cinemas/wishlist-intersection";
 import { normalizeShowtimes, safeProviderError } from "../lib/cinemas/normalize";
-import { validateShowtimeQuery } from "../lib/cinemas/query-validation";
+import { validateScheduleDate, validateShowtimeQuery } from "../lib/cinemas/query-validation";
 import { fetchProviderJson, safeProviderRequestError } from "../lib/cinemas/request";
 import { StarCineplexProvider } from "../lib/cinemas/star-cineplex";
 import {
@@ -13,7 +15,6 @@ import {
   filterAndSortShowtimes,
   safeBookingUrl,
 } from "../lib/cinemas/client";
-import { cinemaMovieProps, initialWishlistCinemaPanelState, wishlistCinemaPanelReducer } from "../lib/cinemas/wishlist-panel";
 
 const context = {
   movieId: "fixture-movie-1",
@@ -35,14 +36,38 @@ test("normalizes a clearly synthetic canonical sample fixture", () => {
     bookingUrl: "https://starcineplex.com/showtimes",
   }] }, context);
 
-  assert.equal(parsed.state, "currently_showing");
+  assert.equal(parsed.state, "screening_scheduled");
+  assert.equal(parsed.screenings[0].availabilityState, "seats_available");
   assert.equal(parsed.screenings[0].startsAt, "2026-10-16T09:30:00.000Z");
   assert.equal(parsed.screenings[0].price?.amount, 550);
   assert.equal(parsed.screenings[0].seatsRemaining, 18);
 });
 
+test("watchlist intersection matches a verified provider IMDb ID", () => {
+  const result = matchScreeningToWatchlist({
+    movieTitle: "Different provider title spelling",
+    movieImdbId: "tt1234567",
+  }, [{ imdbID: "tt1234567", Title: "Watchlist Film", Year: "2024" }]);
+  assert.equal(result?.movie.Title, "Watchlist Film");
+});
+
+test("watchlist intersection requires exact title and release year when IMDb ID is absent", () => {
+  const watchlist = [{ imdbID: "tt1234567", Title: "Dune", Year: "2021" }];
+  assert.equal(matchScreeningToWatchlist({ movieTitle: "Dune", movieReleaseYear: 2021 }, watchlist)?.movie.imdbID, "tt1234567");
+  assert.equal(matchScreeningToWatchlist({ movieTitle: "Dune" }, watchlist), null);
+  assert.equal(matchScreeningToWatchlist({ movieTitle: "Dune", movieReleaseYear: 1984 }, watchlist), null);
+});
+
+test("watchlist intersection excludes ambiguous title and year matches", () => {
+  const result = matchScreeningToWatchlist({ movieTitle: "Dune", movieReleaseYear: 2021 }, [
+    { imdbID: "tt1234567", Title: "Dune", Year: "2021" },
+    { imdbID: "tt7654321", Title: "Dune", Year: "2021" },
+  ]);
+  assert.equal(result, null);
+});
+
 test("empty schedules mean no match, while malformed payloads are provider errors", () => {
-  assert.deepEqual(normalizeShowtimes({ showtimes: [] }, context), { state: "no_matching_screenings", screenings: [] });
+  assert.deepEqual(normalizeShowtimes({ showtimes: [] }, context), { state: "confirmed_no_screenings", screenings: [] });
   assert.throws(() => normalizeShowtimes({ unexpected: true }, context));
   assert.deepEqual(safeProviderError(), { state: "provider_error", message: "Star Cineplex schedule request failed." });
 });
@@ -53,7 +78,27 @@ test("unknown availability is not sold out; sold out requires an explicit provid
     { id: "sold", startsAt: "2026-10-16T13:00:00Z", availability: "sold_out", seatsRemaining: 0 },
   ] }, context);
   assert.equal(parsed.screenings[0].availability, "unknown");
+  assert.equal(parsed.screenings[0].availabilityState, "availability_unknown");
   assert.equal(parsed.screenings[1].availability, "sold_out");
+  assert.equal(parsed.screenings[1].availabilityState, "sold_out");
+});
+
+test("schedule cache excludes dynamic seat counts and availability", () => {
+  const unknown = normalizeShowtimes({ showtimes: [{ id: "unknown", startsAt: "2026-10-16T12:00:00Z" }] }, context).screenings;
+  const withSeatData = normalizeShowtimes({ showtimes: [{
+    id: "available", startsAt: "2026-10-16T12:00:00Z", availability: "available", seatsRemaining: 12,
+  }] }, context).screenings;
+  const base = {
+    state: "available" as const,
+    availabilityState: "data_available" as const,
+    capability: "showtimes",
+    capabilities: { branches: "available" as const, catalogue: "provider_unavailable" as const, showtimes: "available" as const, prices: "data_unavailable" as const, seats: "provider_unavailable" as const },
+    freshness: "current" as const,
+    matchConfidence: "not_applicable" as const,
+    source: { provider: "star-cineplex" as const, sourceUrl: "https://starcineplex.com/showtimes", mode: "provider-feed" as const },
+  };
+  assert.equal(cacheableShowtimeSchedule({ ...base, data: { state: "screening_scheduled", screenings: unknown } }), true);
+  assert.equal(cacheableShowtimeSchedule({ ...base, data: { state: "screening_scheduled", screenings: withSeatData } }), false);
 });
 
 test("movie matching handles punctuation/year and reports title collisions as ambiguous", () => {
@@ -73,12 +118,28 @@ test("query validation bounds movie text and requires a real ISO calendar date",
   assert.equal(validateShowtimeQuery("Film", "2026-02-30").valid, false);
   assert.equal(validateShowtimeQuery("Film", "2026-10-16").valid, true);
   assert.equal(validateShowtimeQuery("x".repeat(161), "2026-10-16").valid, false);
+  assert.equal(validateScheduleDate("2026-10-16").valid, true);
+  assert.equal(validateScheduleDate("2026-02-30").valid, false);
 });
 
 test("provider keeps unverified catalogue unavailable rather than reporting no screenings", async () => {
   const provider = new StarCineplexProvider();
+  const branches = await provider.getLocations();
+  assert.equal(branches.state, "available");
+  assert.equal(branches.capability, "branches");
+  assert.equal(branches.freshness, "dated_snapshot");
+  assert.equal(branches.capabilities.catalogue, "provider_unavailable");
+  assert.equal(branches.capabilities.showtimes, "provider_unavailable");
+  assert.equal(branches.capabilities.prices, "data_unavailable");
+  const catalogue = await provider.getMovies();
+  assert.equal(catalogue.state, "unavailable");
+  assert.equal(catalogue.availabilityState, "provider_unavailable");
+  assert.equal(catalogue.capability, "catalogue");
   const result = await provider.getShowtimes("Example", "2026-10-16");
   assert.equal(result.state, "unavailable");
+  assert.equal(result.availabilityState, "provider_unavailable");
+  assert.equal(result.capability, "showtimes");
+  assert.equal((await provider.getDailySchedule("2026-10-16")).state, "unavailable");
 });
 
 test("provider request errors are sanitized and private hosts are rejected", async () => {
@@ -87,6 +148,17 @@ test("provider request errors are sanitized and private hosts are rejected", asy
   }));
   await assert.rejects(fetchProviderJson("https://example.com/private", async () => new Response("{}")));
   assert.deepEqual(safeProviderRequestError(new Error("secret provider body")), safeProviderError());
+});
+
+test("provider request timeout aborts and returns a sanitized error", async () => {
+  const keepEventLoopAlive = setTimeout(() => undefined, 50);
+  try {
+    await assert.rejects(fetchProviderJson("https://starcineplex.com/feed", async (_input, init) => await new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("request timed out")), { once: true });
+    }), 1));
+  } finally {
+    clearTimeout(keepEventLoopAlive);
+  }
 });
 
 test("bounded cache reuses successful values and coalesces duplicate loads", async () => {
@@ -114,14 +186,16 @@ test("bounded cache serves a successful entry as stale when refresh fails", asyn
   assert.equal(result.stale, true);
 });
 
-test("wishlist showtimes action opens, switches, and closes the selected movie panel", () => {
-  const first = { imdbID: "tt001", Title: "Film One", Year: "2024" };
-  const second = { imdbID: "tt002", Title: "Film Two", Year: "2025" };
-  const opened = wishlistCinemaPanelReducer(initialWishlistCinemaPanelState, { type: "open", movie: first });
-  assert.deepEqual(cinemaMovieProps(opened.selectedMovie!), { imdbId: "tt001", title: "Film One", year: "2024" });
-  const switched = wishlistCinemaPanelReducer(opened, { type: "open", movie: second });
-  assert.equal(switched.selectedMovie?.imdbID, "tt002");
-  assert.equal(wishlistCinemaPanelReducer(switched, { type: "close" }).selectedMovie, null);
+test("bounded cache recovers with fresh data after a stale fallback", async () => {
+  const cache = new BoundedAsyncCache<number>(1, 1_000, 1);
+  await cache.get("recover", async () => 7);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const stale = await cache.get("recover", async () => { throw new Error("upstream down"); });
+  assert.equal(stale.value, 7);
+  assert.equal(stale.stale, true);
+  const recovered = await cache.get("recover", async () => 9);
+  assert.equal(recovered.value, 9);
+  assert.equal(recovered.stale, false);
 });
 
 test("frontend API client maps HTTP 503, network failure, and invalid JSON separately", async () => {
@@ -135,6 +209,13 @@ test("frontend API client maps HTTP 503, network failure, and invalid JSON separ
   assert.equal(unavailable.state, "unavailable");
   if (unavailable.state === "unavailable") assert.equal(unavailable.message, "No verified feed.");
   assert.equal((await unavailableClient.getShowtimes("Film", "2026-10-16")).state, "unavailable");
+  let dailyPath = "";
+  const dailyClient = new CinemaApiClient(async (input) => {
+    dailyPath = String(input);
+    return new Response(JSON.stringify(unavailableBody), { status: 503 });
+  });
+  assert.equal((await dailyClient.getDailyShowtimes("2026-10-16")).state, "unavailable");
+  assert.match(dailyPath, /\/api\/cinemas\/showtimes\?date=2026-10-16$/);
   const networkClient = new CinemaApiClient(async () => { throw new Error("offline"); });
   assert.equal((await networkClient.getLocations()).state, "network_error");
   const invalidClient = new CinemaApiClient(async () => new Response("not-json", { status: 200 }));
