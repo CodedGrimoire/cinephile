@@ -26,23 +26,47 @@ function availabilityLabel(showtime: Showtime): string {
   return "Seat availability unknown";
 }
 
-export default function CineplexAvailability({ watchlist }: { watchlist: WatchlistTitle[] }) {
-  const [date, setDate] = useState(() => dhakaDate());
-  const [result, setResult] = useState<CinemaClientResult<ShowtimeListing> | null>(null);
-  const [retryKey, setRetryKey] = useState(0);
-  const forceRefreshRef = useRef(false);
+export default function CineplexAvailability({
+  watchlist,
+  initialDate,
+  initialSchedule,
+}: {
+  watchlist: WatchlistTitle[];
+  initialDate: string;
+  initialSchedule: CinemaClientResult<ShowtimeListing>;
+}) {
+  const [date, setDate] = useState(initialDate);
+  const [result, setResult] = useState<CinemaClientResult<ShowtimeListing> | null>(initialSchedule);
+  const requestControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    const initialFetchedAt = initialSchedule.state === "success" ? initialSchedule.source.fetchedAt : undefined;
+    if (date === initialDate && initialFetchedAt && Date.now() - Date.parse(initialFetchedAt) < 60_000) return;
+
     const controller = new AbortController();
+    requestControllerRef.current = controller;
     setResult(null);
     if (watchlist.length === 0) return () => controller.abort();
-    const forceRefresh = forceRefreshRef.current;
-    forceRefreshRef.current = false;
-    void apiClient.getDailyShowtimes(date, controller.signal, forceRefresh).then((response) => {
+    void apiClient.getDailyShowtimes(date, controller.signal).then((response) => {
       if (!controller.signal.aborted) setResult(response);
     });
-    return () => controller.abort();
-  }, [date, retryKey, watchlist.length]);
+    return () => {
+      controller.abort();
+      requestControllerRef.current?.abort();
+    };
+  }, [date, initialDate, initialSchedule, watchlist.length]);
+
+  useEffect(() => () => requestControllerRef.current?.abort(), []);
+
+  const refreshShowtimes = () => {
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    setResult(null);
+    void apiClient.getDailyShowtimes(date, controller.signal, true).then((response) => {
+      if (!controller.signal.aborted) setResult(response);
+    });
+  };
 
   const grouped = useMemo(() => {
     if (result?.state !== "success") return [];
@@ -143,7 +167,7 @@ export default function CineplexAvailability({ watchlist }: { watchlist: Watchli
         <a href={OFFICIAL_SCHEDULE_URL} target="_blank" rel="noopener noreferrer" className="text-sm text-cyan-100 underline decoration-cyan-100/40 underline-offset-4">
           Official Star Cineplex schedule
         </a>
-        <button type="button" disabled={!result} onClick={() => { forceRefreshRef.current = true; setRetryKey((key) => key + 1); }} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50">
+        <button type="button" disabled={!result} onClick={refreshShowtimes} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50">
           {result?.state === "network_error" || result?.state === "invalid_response" ? "Retry showtimes" : "Refresh showtimes"}
         </button>
       </div>

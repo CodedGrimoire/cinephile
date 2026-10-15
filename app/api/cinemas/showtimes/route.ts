@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cacheable, liveScheduleCache } from "@/lib/cinemas/route-cache";
 import { validateScheduleDate, validateShowtimeQuery } from "@/lib/cinemas/query-validation";
-import { starCineplexProvider } from "@/lib/cinemas/star-cineplex";
+import { getCachedDailySchedule } from "@/lib/cinemas/schedule-service";
 import { STAR_CINEPLEX_CAPABILITIES } from "@/lib/cinemas/types";
 
 export const runtime = "nodejs";
@@ -22,15 +21,7 @@ export async function GET(request: NextRequest) {
   const movie = movieValidation?.valid ? movieValidation.value.movie : undefined;
 
   try {
-    const cacheKey = movie
-      ? `star-cineplex:showtimes:${movie.toLocaleLowerCase("en")}:${date}`
-      : `star-cineplex:showtimes:all:${date}`;
-    const loader = () => movie
-      ? starCineplexProvider.getShowtimes(movie, date)
-      : starCineplexProvider.getDailySchedule(date);
-    if (forceRefresh) liveScheduleCache.delete(cacheKey);
-    const cached = await liveScheduleCache.get(cacheKey, loader, cacheable);
-    const result = cached.value;
+    const result = await getCachedDailySchedule(date, movie, forceRefresh);
     const status = result.state === "available" ? 200 : result.state === "unavailable" ? 503 : 502;
     return NextResponse.json(result, {
       status,
