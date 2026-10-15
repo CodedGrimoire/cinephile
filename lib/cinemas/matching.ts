@@ -6,7 +6,7 @@ export type MovieCandidate = {
 };
 
 export type MovieMatch =
-  | { state: "matched"; candidate: MovieCandidate; confidence: number; reason: "exact_title_and_year" | "exact_title" }
+  | { state: "matched"; candidate: MovieCandidate; confidence: number; reason: "exact_imdb_id" | "exact_title_and_year" | "exact_title" }
   | { state: "ambiguous"; candidates: Array<{ candidate: MovieCandidate; confidence: number }> }
   | { state: "unresolved"; candidates: Array<{ candidate: MovieCandidate; confidence: number }> };
 
@@ -36,9 +36,16 @@ export function matchMovieTitle(
   query: MovieCandidate,
   candidates: MovieCandidate[],
 ): MovieMatch {
+  if (query.imdbId) {
+    const exactIds = candidates.filter((candidate) => candidate.imdbId === query.imdbId);
+    if (exactIds.length === 1) return { state: "matched", candidate: exactIds[0], confidence: 1, reason: "exact_imdb_id" };
+    if (exactIds.length > 1) {
+      return { state: "ambiguous", candidates: exactIds.map((candidate) => ({ candidate, confidence: 1 })) };
+    }
+  }
   const queryTitles = titles(query);
   const queryYear = yearNumber(query.year);
-  const ranked = candidates.map((candidate) => {
+  const ranked = candidates.filter((candidate) => !query.imdbId || !candidate.imdbId || candidate.imdbId === query.imdbId).map((candidate) => {
     const candidateTitles = titles(candidate);
     const exact = [...queryTitles].some((title) => candidateTitles.has(title));
     const sameYear = queryYear !== undefined && queryYear === yearNumber(candidate.year);
@@ -47,7 +54,7 @@ export function matchMovieTitle(
 
   if (ranked.length === 1) {
     const best = ranked[0];
-    if (queryYear !== undefined && yearNumber(best.candidate.year) !== undefined && !best.sameYear) {
+    if (queryYear !== undefined && !best.sameYear) {
       return { state: "unresolved", candidates: [{ candidate: best.candidate, confidence: 0.35 }] };
     }
     return {

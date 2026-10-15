@@ -1,4 +1,5 @@
 import type { AvailabilityStatus, ScreeningFormat, Showtime } from "./types";
+import { dateInTimezone } from "./calendar";
 
 export type NormalizationContext = {
   movieId: string;
@@ -59,7 +60,7 @@ export function normalizeShowtimes(payload: unknown, context: NormalizationConte
     const row = asRecord(item);
     if (!row || typeof row.id !== "string" || typeof row.startsAt !== "string") throw new ProviderPayloadError();
     const startsAt = new Date(row.startsAt);
-    if (!Number.isFinite(startsAt.getTime()) || startsAt.toISOString().slice(0, 10) !== context.date) throw new ProviderPayloadError();
+    if (!Number.isFinite(startsAt.getTime()) || dateInTimezone(startsAt, "Asia/Dhaka") !== context.date) throw new ProviderPayloadError();
 
     const priceRecord = asRecord(row.price);
     const priceAmount = priceRecord?.amount;

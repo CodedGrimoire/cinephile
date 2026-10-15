@@ -1,8 +1,10 @@
-# Star Cineplex integration (Phase 1)
+# Star Cineplex integration
 
 ## Architecture
 
-Cinema code is isolated under `lib/cinemas`. `types.ts` holds the domain model; `star-cineplex.ts` is the provider adapter; `normalize.ts` maps a canonical, permitted feed payload into domain showtimes; `matching.ts` matches IMDb-backed Cinephile titles conservatively; `request.ts` provides an 8-second timeout and official-host allowlist for a future verified feed; and `cache.ts` coalesces duplicate work in a bounded process-local cache. No cinema code is imported by the existing Firebase, discovery, wishlist, or page routes.
+Cinema code is isolated under `lib/cinemas`. `types.ts` holds the domain model; `star-cineplex.ts` is the provider adapter; `normalize.ts` maps a canonical, permitted feed payload into domain showtimes; `matching.ts` matches IMDb-backed Cinephile titles conservatively; `request.ts` provides an 8-second timeout and official-host allowlist for a future verified feed; and `cache.ts` coalesces duplicate work in a bounded process-local cache.
+
+`app/components/CinemaShowtimes.tsx` opens the integration from a single wishlist dialog. The wishlist stores no new fields; it passes the existing IMDb ID, title, and year into the panel. The panel fetches only while open, matches provider movie records before asking for showtimes, aborts superseded requests, and filters/sorts returned screenings by branch and date. Bangladesh-local dates and display times use `Asia/Dhaka`. The app continues to use the existing Firestore list fields and movie details modal.
 
 ## Source and access status
 
@@ -61,12 +63,18 @@ Successful listing responses use a 12-minute bounded in-process cache with dupli
 
 ## Matching
 
-`matchMovieTitle` accepts existing IMDb-style records and provider titles/aliases. It normalizes case, punctuation, Unicode accents, and `&`/`and`, and uses the release year to resolve title collisions. Fuzzy/similarity matches are not accepted. Ambiguous and unresolved results remain explicit for later UI integration.
+`matchMovieTitle` accepts existing IMDb-style records and provider titles/aliases. It prefers an exact IMDb ID, otherwise normalizes case, punctuation, Unicode accents, and `&`/`and`, and uses release year to resolve title collisions. Conflicting IMDb IDs are not matched by title fallback. Fuzzy/similarity matches are not accepted. Ambiguous and unresolved results remain explicit.
+
+## Wishlist showtimes experience
+
+`Cinema Showtimes` appears on each My Watchlist card and opens one modal for the selected movie. It shows the dated branch directory as a snapshot, an Asia/Dhaka date input, and grouped showtimes when an authorized provider response is available. It displays optional format, availability, seat count, price, and direct booking action only when a validated response supplies those fields. Unknown seat availability remains explicit. The generic booking link always points to the official schedule page; direct URLs are accepted only on HTTPS `starcineplex.com` hosts.
+
+The current 503 provider response displays: “Star Cineplex showtimes are currently unavailable. Check the official website for the latest schedule.” Network failures, invalid responses, unmatched catalogue titles, and successful empty schedules have separate states. A cinema branch/date filter never turns a provider failure into a no-showings claim. No polling or booking automation is used.
 
 ## Verification
 
-With dependencies installed, run `npx tsc --noEmit`, `npx eslint .`, `npm run test:cinemas`, and `npm run build`. Tests are in `tests/cinemas.test.ts`; they use synthetic fixture data and cover normalization, empty and malformed schedules, availability semantics, matching ambiguity, parameter validation, provider-unavailable behavior, and cache behavior. Live showtime retrieval has not been verified and is not claimed to work.
+With dependencies installed, run `npx tsc --noEmit`, `npm run lint`, `npm run test:cinemas`, and `npm run build`. Tests are in `tests/cinemas.test.ts`; fixtures are synthetic and isolated to tests. Coverage includes normalization, empty and malformed schedules, availability semantics, matching ambiguity/IMDb IDs, parameter validation, provider-unavailable behavior, cache behavior, wishlist panel state, client response states, filtering, booking URLs, and cancellation. Live showtime retrieval has not been verified and is not claimed to work.
 
-## Phase 2
+## Remaining work
 
-Before wishlist integration, obtain written/public provider access details (feed URL/schema, permitted authentication, rate limits, and cache rules), verify a real response, and add permitted response fixtures. Then connect IMDb movie records through the matcher and build any user-facing showtime experience. Seat-level availability should remain opt-in and non-polling unless the provider documents a supported method.
+To make live retrieval operational, obtain written/public provider access details (feed URL/schema, permitted authentication, rate limits, and cache rules), verify a real response, and add permitted response fixtures. Seat-level availability and notifications remain future work; seat data should stay opt-in and non-polling unless the provider documents a supported method.

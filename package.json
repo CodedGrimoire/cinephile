@@ -6,16 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test:cinemas": "tsc -p tsconfig.cinema-tests.json && node --test /private/tmp/cinephile-cinema-test-build/tests/cinemas.test.js"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.12",
     "axios": "^1.9.0",
     "firebase": "^11.8.1",
-    "next": "^15.3.3",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "next": "^15.5.28",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -25,7 +25,7 @@
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",
-    "eslint-config-next": "15.3.3",
+    "eslint-config-next": "15.5.28",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.12",
     "typescript": "^5"

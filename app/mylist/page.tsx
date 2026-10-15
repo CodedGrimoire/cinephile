@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/firebaseConfig";
 import { doc, getDoc, updateDoc, arrayRemove, arrayUnion } from "firebase/firestore";
+import CinemaShowtimes from "@/app/components/CinemaShowtimes";
+import { cinemaMovieProps, initialWishlistCinemaPanelState, wishlistCinemaPanelReducer } from "@/lib/cinemas/wishlist-panel";
 
 interface Movie {
   imdbID: string;
@@ -22,7 +24,13 @@ export default function MyListPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [modalMovie, setModalMovie] = useState<Movie | null>(null);
+  const [cinemaPanel, dispatchCinemaPanel] = useReducer(wishlistCinemaPanelReducer, initialWishlistCinemaPanelState);
+  const cinemaTriggerRef = useRef<HTMLButtonElement | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!cinemaPanel.selectedMovie) cinemaTriggerRef.current?.focus();
+  }, [cinemaPanel.selectedMovie]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -96,54 +104,65 @@ export default function MyListPage() {
   };
 
   const MovieCard = ({ movie, isWatched = false }: { movie: Movie; isWatched?: boolean }) => (
-    <div
-      onClick={() => setModalMovie(movie)}
-      className="cursor-pointer bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-4 text-white shadow-lg hover:bg-white/20 transition-all duration-300 hover:scale-105 flex-shrink-0 w-64"
-    >
-      <img
-        src={movie.Poster !== "N/A" ? movie.Poster : "/placeholder.png"}
-        alt={movie.Title}
-        className="w-full h-80 object-cover rounded-md mb-4"
-      />
-      <h3 className="text-lg font-semibold mb-1 truncate">{movie.Title}</h3>
-      <p className="text-white/60 text-sm mb-3">{movie.Year}</p>
-      <div className="flex gap-2">
+    <article className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-4 text-white shadow-lg hover:bg-white/20 transition-all duration-300 hover:scale-105 flex-shrink-0 w-64">
+      <button
+        type="button"
+        onClick={() => setModalMovie(movie)}
+        className="block w-full rounded text-left focus:outline-none focus:ring-2 focus:ring-cyan-300"
+        aria-label={`View details for ${movie.Title}`}
+      >
+        <img
+          src={movie.Poster !== "N/A" ? movie.Poster : "/placeholder.png"}
+          alt=""
+          className="w-full h-80 object-cover rounded-md mb-4"
+        />
+        <h3 className="text-lg font-semibold mb-1 truncate">{movie.Title}</h3>
+        <p className="text-white/60 text-sm mb-3">{movie.Year}</p>
+      </button>
+      <div className="mt-2 flex flex-col gap-2">
         {!isWatched ? (
-          <>
-           <button
-  onClick={(e) => {
-    e.stopPropagation();
-    markAsWatched(movie);
-  }}
-  className="px-3 py-2 bg-blue-500/20 text-blue-300 border border-blue-300/50 rounded-full hover:bg-blue-500/30 transition text-sm flex-1
-             hover:shadow-[0_0_8px_rgba(255,255,255,0.7)]"
->
-  Watched
-</button>
+          <div className="flex gap-2">
             <button
-  onClick={(e) => {
-    e.stopPropagation();
-    removeFromList(movie);
-  }}
-  className="px-3 py-2 bg-purple-500/20 text-purple-300 border border-purple-300/50 rounded-full hover:bg-purple-500/30 transition text-sm flex-1
-             hover:shadow-[0_0_8px_rgba(255,255,255,0.7)]"
->
-  Remove
-</button>
-          </>
+              type="button"
+              onClick={() => markAsWatched(movie)}
+              className="px-3 py-2 bg-blue-500/20 text-blue-300 border border-blue-300/50 rounded-full hover:bg-blue-500/30 transition text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-cyan-300"
+            >
+              Watched
+            </button>
+            <button
+              type="button"
+              onClick={() => removeFromList(movie)}
+              className="px-3 py-2 bg-purple-500/20 text-purple-300 border border-purple-300/50 rounded-full hover:bg-purple-500/30 transition text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-cyan-300"
+            >
+              Remove
+            </button>
+          </div>
         ) : (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              removeFromWatched(movie);
-            }}
-            className="px-3 py-2 bg-purple-500/20 text-purple-300 border border-purple-300/50 rounded-full hover:bg-purple-500/30 transition text-sm w-full"
+            type="button"
+            onClick={() => removeFromWatched(movie)}
+            className="px-3 py-2 bg-purple-500/20 text-purple-300 border border-purple-300/50 rounded-full hover:bg-purple-500/30 transition text-sm w-full focus:outline-none focus:ring-2 focus:ring-cyan-300"
           >
             Remove
           </button>
         )}
+        {!isWatched && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              cinemaTriggerRef.current = event.currentTarget;
+              setModalMovie(null);
+              dispatchCinemaPanel({ type: "open", movie });
+            }}
+            className="w-full rounded-full border border-cyan-200/35 bg-cyan-400/10 px-3 py-2 text-sm text-cyan-100 transition hover:bg-cyan-400/20 focus:outline-none focus:ring-2 focus:ring-cyan-300"
+            aria-label={`Show Star Cineplex times for ${movie.Title}`}
+          >
+            Cinema Showtimes
+          </button>
+        )}
       </div>
-    </div>
+    </article>
   );
 
   return (
@@ -238,6 +257,14 @@ export default function MyListPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {cinemaPanel.selectedMovie && (
+        <CinemaShowtimes
+          key={cinemaPanel.selectedMovie.imdbID}
+          movie={cinemaMovieProps(cinemaPanel.selectedMovie)}
+          onClose={() => dispatchCinemaPanel({ type: "close" })}
+        />
       )}
 
       <style jsx global>{`
