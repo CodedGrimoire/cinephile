@@ -5,6 +5,7 @@ import MovieCard from "../components/MovieCard";
 import MovieModal from "../components/MovieModal";
 import UserDropdown from "../components/UserDropdown";
 import LoadingSpinner from "../components/LoadingSpinner";
+import MovieDiscoverySections from "../components/MovieDiscoverySections";
 import { featuredMoviesFetcher } from "../components/FeaturedMoviesFetcher";
 import axios from "axios";
 import { useRouter } from "next/navigation";
@@ -298,6 +299,11 @@ export default function Homepage() {
             </div>
           </div>
         )}
+
+        <MovieDiscoverySections
+          onMovieClick={handleMovieClick}
+          onAddToList={addToList}
+        />
 
         {/* Featured Movies Section - Horizontal Scrollable with Dynamic Content */}
         <div className="w-full max-w-7xl mx-auto mb-16">

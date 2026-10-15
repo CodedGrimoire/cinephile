@@ -8,6 +8,7 @@ interface Movie {
   Type: string;
   Poster: string;
   imdbRating?: string;
+  ratingLabel?: string;
   Actors?: string;
   Genre?: string;
   Plot?: string;
@@ -50,7 +51,7 @@ export default function MovieModal({ movie, onClose }: MovieModalProps) {
               Genre: {movie.Genre}
             </p>
             <p className="text-sm text-yellow-300 mb-1">
-              ⭐ IMDb: {movie.imdbRating}
+              ⭐ {movie.ratingLabel ?? "IMDb"}: {movie.imdbRating}
             </p>
             <p className="text-sm text-white/60 mb-3">
               Cast: {movie.Actors}

@@ -8,6 +8,8 @@ interface Movie {
   Type: string;
   Poster: string;
   imdbRating?: string;
+  ratingLabel?: string;
+  ReleaseDate?: string;
   Actors?: string;
   Genre?: string;
   Plot?: string;
@@ -37,9 +39,12 @@ export default function MovieCard({
         />
         <h3 className="text-xl font-semibold mb-2 text-white">{movie.Title}</h3>
         <p className="text-white/70 mb-1">{movie.Year}</p>
+        {movie.ReleaseDate && (
+          <p className="text-white/60 text-sm mb-1">Release date: {movie.ReleaseDate}</p>
+        )}
         {movie.imdbRating && (
           <p className="text-yellow-300 text-sm mb-1 flex items-center justify-center gap-1">
-            <span>⭐</span> IMDb: {movie.imdbRating}
+            <span>⭐</span> {movie.ratingLabel ?? "IMDb"}: {movie.imdbRating}
           </p>
         )}
         {movie.Actors && (
