@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:cinemas": "tsc -p tsconfig.cinema-tests.json && node --test /private/tmp/cinephile-cinema-test-build/tests/cinemas.test.js"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.12",
