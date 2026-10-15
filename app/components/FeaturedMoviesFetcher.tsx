@@ -16,6 +16,7 @@ export interface Movie {
 
 export class FeaturedMoviesFetcher {
   private apikey = "https://www.omdbapi.com/?apikey=a4d5b9";
+  private yearResultsCache = new Map<string, { expiresAt: number; movies: Movie[] }>();
 
   // Curated lists of high-rated recent movies (2020-2025) by genre - NO DUPLICATES
   private genreMovies = {
@@ -110,6 +111,8 @@ export class FeaturedMoviesFetcher {
     try {
       const { data } = await axios.get(`${this.apikey}&i=${movieId}&plot=short`);
       const movieData = data as Record<string, any>;
+      if (movieData.Response !== "True" || typeof movieData.Title !== "string" ||
+        typeof movieData.Year !== "string" || typeof movieData.imdbID !== "string") return null;
       
       return {
         Title: movieData.Title,
@@ -225,6 +228,45 @@ export class FeaturedMoviesFetcher {
     return movies;
   }
 
+  private async searchYear(year: number, count: number): Promise<Movie[]> {
+    const cacheKey = `${year}:${count}`;
+    const cached = this.yearResultsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.movies;
+
+    // OMDb requires a title search term even when filtering by release year.
+    // Merge several broad title searches, then deduplicate before loading details.
+    const titleTerms = ["the", "love", "man"];
+    const responses = await Promise.allSettled(titleTerms.map(async (term) => {
+      const { data } = await axios.get<{ Search?: Array<{ imdbID: string }>; Response: string }>(
+        `${this.apikey}&${new URLSearchParams({ s: term, y: String(year), type: "movie" })}`
+      );
+      return data.Response === "True" ? data.Search ?? [] : [];
+    }));
+    const succeeded = responses.some((response) => response.status === "fulfilled");
+    if (!succeeded) throw new Error("Could not reach OMDb to load movie releases.");
+    const ids = [...new Set(responses.flatMap((response) =>
+      response.status === "fulfilled" ? response.value.flatMap((movie) => typeof movie.imdbID === "string" ? [movie.imdbID] : []) : []
+    ))].slice(0, Math.max(count * 2, count));
+    const details = await Promise.all(ids.map((id) => this.fetchMovieDetails(id)));
+    const movies = details.filter((movie): movie is Movie =>
+      movie !== null && Boolean(movie.Title && movie.imdbID) && movie.Year.startsWith(String(year))
+    );
+    this.yearResultsCache.set(cacheKey, { expiresAt: Date.now() + 30 * 60 * 1000, movies });
+    return movies;
+  }
+
+  public async getMoviesByYear(year: number, minRating: number = 7.5, count: number = 10): Promise<Movie[]> {
+    const movies = await this.searchYear(year, count);
+    return movies
+      .filter((movie) => movie.imdbRating !== undefined && Number(movie.imdbRating) >= minRating)
+      .sort((a, b) => Number(b.imdbRating) - Number(a.imdbRating) || a.Title.localeCompare(b.Title))
+      .slice(0, count);
+  }
+
+  public async getUpcomingMovies(year: number, count: number = 10): Promise<Movie[]> {
+    return (await this.searchYear(year, count)).slice(0, count);
+  }
+
   // Method to refresh featured movies
   public async refreshFeaturedMovies(count: number = 8): Promise<Movie[]> {
     return this.getFeaturedMovies(count);
@@ -238,6 +280,9 @@ export const featuredMoviesFetcher = new FeaturedMoviesFetcher();
 export const useFeaturedMovies = () => {
   return {
     getFeaturedMovies: (count?: number) => featuredMoviesFetcher.getFeaturedMovies(count),
+    getMoviesByYear: (year: number, minRating?: number, count?: number) =>
+      featuredMoviesFetcher.getMoviesByYear(year, minRating, count),
+    getUpcomingMovies: (year: number, count?: number) => featuredMoviesFetcher.getUpcomingMovies(year, count),
     refreshFeaturedMovies: (count?: number) => featuredMoviesFetcher.refreshFeaturedMovies(count),
   };
 };

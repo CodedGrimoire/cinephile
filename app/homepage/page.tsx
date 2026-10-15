@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import SearchBar from "../components/search";
 import MovieCard from "../components/MovieCard";
 import MovieModal from "../components/MovieModal";
+import MovieDiscoverySections from "../components/MovieDiscoverySections";
 import UserDropdown from "../components/UserDropdown";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { featuredMoviesFetcher } from "../components/FeaturedMoviesFetcher";
@@ -340,6 +341,8 @@ export default function Homepage() {
             </div>
           </div>
         )}
+
+        <MovieDiscoverySections onMovieClick={handleMovieClick} onAddToList={addToList} />
 
         {/* Featured Movies Section - Horizontal Scrollable with Dynamic Content */}
         <div className="w-full max-w-7xl mx-auto mb-16">
