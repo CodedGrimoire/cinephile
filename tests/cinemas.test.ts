@@ -262,7 +262,7 @@ test("frontend API client maps HTTP 503, network failure, and invalid JSON separ
     return new Response(JSON.stringify(unavailableBody), { status: 503 });
   });
   assert.equal((await dailyClient.getDailyShowtimes("2026-10-16")).state, "unavailable");
-  assert.match(dailyPath, /\/api\/cinemas\/showtimes\?date=2026-10-16$/);
+  assert.match(dailyPath, /\/api\/star-schedule\?date=2026-10-16$/);
   const networkClient = new CinemaApiClient(async () => { throw new Error("offline"); });
   assert.equal((await networkClient.getLocations()).state, "network_error");
   const invalidClient = new CinemaApiClient(async () => new Response("not-json", { status: 200 }));
@@ -271,8 +271,9 @@ test("frontend API client maps HTTP 503, network failure, and invalid JSON separ
 
 test("frontend API client retries one transient same-origin network failure", async () => {
   let calls = 0;
-  const client = new CinemaApiClient(async (_input, init) => {
+  const client = new CinemaApiClient(async (input, init) => {
     calls += 1;
+    assert.equal(input, "/api/star-schedule?date=2026-10-16");
     assert.equal(init?.cache, "no-store");
     if (calls === 1) throw new TypeError("transient fetch failure");
     return new Response(JSON.stringify({

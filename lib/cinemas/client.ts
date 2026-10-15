@@ -132,12 +132,12 @@ export class CinemaApiClient {
 
   async getShowtimes(movie: string, date: string, signal?: AbortSignal): Promise<CinemaClientResult<ShowtimeListing>> {
     const query = new URLSearchParams({ movie, date });
-    return this.request(`/api/cinemas/showtimes?${query.toString()}`, signal, this.showtimeListing);
+    return this.request(`/api/star-schedule?${query.toString()}`, signal, this.showtimeListing);
   }
 
   async getDailyShowtimes(date: string, signal?: AbortSignal, refresh = false): Promise<CinemaClientResult<ShowtimeListing>> {
     const query = new URLSearchParams({ date, ...(refresh ? { refresh: "1" } : {}) });
-    return this.request(`/api/cinemas/showtimes?${query.toString()}`, signal, this.showtimeListing);
+    return this.request(`/api/star-schedule?${query.toString()}`, signal, this.showtimeListing);
   }
 
   private showtimeListing(body: unknown): { data: ShowtimeListing; source: SourceMetadata } | null {
