@@ -269,6 +269,23 @@ test("frontend API client maps HTTP 503, network failure, and invalid JSON separ
   assert.equal((await invalidClient.getMovies()).state, "invalid_response");
 });
 
+test("frontend API client retries one transient same-origin network failure", async () => {
+  let calls = 0;
+  const client = new CinemaApiClient(async (_input, init) => {
+    calls += 1;
+    assert.equal(init?.cache, "no-store");
+    if (calls === 1) throw new TypeError("transient fetch failure");
+    return new Response(JSON.stringify({
+      state: "available",
+      data: { state: "screening_scheduled", screenings: [] },
+      source: { provider: "star-cineplex", sourceUrl: "https://api.kichole.com/inventory/api/shows", mode: "provider-feed" },
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+  const result = await client.getDailyShowtimes("2026-10-16");
+  assert.equal(result.state, "success");
+  assert.equal(calls, 2);
+});
+
 test("client refuses malformed successful payloads", async () => {
   const client = new CinemaApiClient(async () => new Response(JSON.stringify({ state: "available", data: {}, source: {} }), { status: 200 }));
   assert.equal((await client.getMovies()).state, "invalid_response");

@@ -124,7 +124,13 @@ export default function CineplexAvailability({ watchlist }: { watchlist: Watchli
         )}
         {result && result.state !== "success" && (
           <div>
-            <p className="font-medium text-amber-100">Live Star Cineplex showtimes aren’t available in Cinephile yet.</p>
+            <p className="font-medium text-amber-100">
+              {result.state === "network_error"
+                ? "Cinephile couldn’t load its showtimes right now."
+                : result.state === "invalid_response"
+                  ? "Cinephile couldn’t read the showtime response."
+                  : "Live Star Cineplex showtimes aren’t available right now."}
+            </p>
             <p className="mt-1 text-sm text-white/55">{result.message}</p>
             <a href={OFFICIAL_SCHEDULE_URL} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm text-cyan-100 underline underline-offset-4">
               View the official Star Cineplex schedule
@@ -138,7 +144,7 @@ export default function CineplexAvailability({ watchlist }: { watchlist: Watchli
           Official Star Cineplex schedule
         </a>
         <button type="button" disabled={!result} onClick={() => { forceRefreshRef.current = true; setRetryKey((key) => key + 1); }} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50">
-          Refresh
+          {result?.state === "network_error" || result?.state === "invalid_response" ? "Retry showtimes" : "Refresh showtimes"}
         </button>
       </div>
     </section>

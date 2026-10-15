@@ -171,12 +171,25 @@ export class CinemaApiClient {
     signal: AbortSignal | undefined,
     validate: (body: unknown) => { data: T; source: SourceMetadata } | null,
   ): Promise<CinemaClientResult<T>> {
+    let response: Response;
     try {
-      const response = await this.fetcher(path, { method: "GET", headers: { Accept: "application/json" }, signal });
-      return await readResponse(response, validate);
+      response = await this.fetcher(path, { method: "GET", headers: { Accept: "application/json" }, signal, cache: "no-store" });
     } catch {
       if (signal?.aborted) return { state: "network_error", message: "Request cancelled." };
-      return { state: "network_error", message: "Could not connect to Star Cineplex. Check your connection and retry." };
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      if (signal?.aborted) return { state: "network_error", message: "Request cancelled." };
+      try {
+        response = await this.fetcher(path, { method: "GET", headers: { Accept: "application/json" }, signal, cache: "no-store" });
+      } catch {
+        return signal?.aborted
+          ? { state: "network_error", message: "Request cancelled." }
+          : { state: "network_error", message: "Cinephile could not load showtimes. Check your connection and retry." };
+      }
+    }
+    try {
+      return await readResponse(response, validate);
+    } catch {
+      return { state: "invalid_response", message: "Cinephile could not read the showtime response." };
     }
   }
 }
