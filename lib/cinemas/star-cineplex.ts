@@ -28,8 +28,17 @@ function metadata(mode: "official-public-directory" | "provider-feed", sourceUrl
     : { ...source, checkedAt: new Date().toISOString() };
 }
 
-/** Provider boundary. Schedule methods remain unavailable until an authorized feed is verified. */
+/** Server-side adapter contract for a future source approved by Star Cineplex. */
+export type AuthorizedStarCineplexAdapter = {
+  getMovies?(): Promise<ProviderResult<CinemaMovie[]>>;
+  getShowtimes?(movie: string, date: string): Promise<ShowtimeResult>;
+  getDailySchedule?(date: string): Promise<ShowtimeResult>;
+};
+
+/** Provider boundary. The production singleton is deliberately constructed without an adapter. */
 export class StarCineplexProvider {
+  constructor(private readonly authorizedAdapter?: AuthorizedStarCineplexAdapter) {}
+
   async getLocations(): Promise<ProviderResult<CinemaLocation[]>> {
     return {
       state: "available",
@@ -45,14 +54,17 @@ export class StarCineplexProvider {
   }
 
   async getMovies(): Promise<ProviderResult<CinemaMovie[]>> {
+    if (this.authorizedAdapter?.getMovies) return this.authorizedAdapter.getMovies();
     return this.unavailable("catalogue", "provider_unavailable", `${OFFICIAL_ROOT}/movies?status=now-showing`);
   }
 
-  async getShowtimes(_movie: string, _date: string): Promise<ShowtimeResult> {
+  async getShowtimes(movie: string, date: string): Promise<ShowtimeResult> {
+    if (this.authorizedAdapter?.getShowtimes) return this.authorizedAdapter.getShowtimes(movie, date);
     return this.unavailable("showtimes", "provider_unavailable", `${OFFICIAL_ROOT}/showtimes`);
   }
 
-  async getDailySchedule(_date: string): Promise<ShowtimeResult> {
+  async getDailySchedule(date: string): Promise<ShowtimeResult> {
+    if (this.authorizedAdapter?.getDailySchedule) return this.authorizedAdapter.getDailySchedule(date);
     return this.unavailable("showtimes", "provider_unavailable", `${OFFICIAL_ROOT}/showtimes`);
   }
 

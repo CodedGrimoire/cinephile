@@ -72,6 +72,13 @@ test("empty schedules mean no match, while malformed payloads are provider error
   assert.deepEqual(safeProviderError(), { state: "provider_error", message: "Star Cineplex schedule request failed." });
 });
 
+test("normalizer rejects screenings without timestamps or associated with another calendar date", () => {
+  assert.throws(() => normalizeShowtimes({ showtimes: [{ id: "missing-date" }] }, context));
+  assert.throws(() => normalizeShowtimes({ showtimes: [
+    { id: "same-clock-next-day", startsAt: "2026-10-17T13:00:00+06:00" },
+  ] }, context));
+});
+
 test("unknown availability is not sold out; sold out requires an explicit provider status", () => {
   const parsed = normalizeShowtimes({ showtimes: [
     { id: "unknown", startsAt: "2026-10-16T12:00:00Z" },
@@ -140,6 +147,24 @@ test("provider keeps unverified catalogue unavailable rather than reporting no s
   assert.equal(result.availabilityState, "provider_unavailable");
   assert.equal(result.capability, "showtimes");
   assert.equal((await provider.getDailySchedule("2026-10-16")).state, "unavailable");
+});
+
+test("authorized provider adapters are injectable while the production default stays inactive", async () => {
+  const defaultProvider = new StarCineplexProvider();
+  assert.equal((await defaultProvider.getMovies()).state, "unavailable");
+
+  const fallback = await defaultProvider.getDailySchedule("2026-10-16");
+  let requestedDate = "";
+  const configuredProvider = new StarCineplexProvider({
+    getDailySchedule: async (date) => {
+      requestedDate = date;
+      return fallback;
+    },
+  });
+  assert.equal(await configuredProvider.getDailySchedule("2026-10-17"), fallback);
+  assert.equal(requestedDate, "2026-10-17");
+  assert.equal((await configuredProvider.getMovies()).state, "unavailable");
+  assert.equal((await configuredProvider.getShowtimes("Film", "2026-10-17")).state, "unavailable");
 });
 
 test("provider request errors are sanitized and private hosts are rejected", async () => {
