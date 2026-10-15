@@ -80,6 +80,7 @@ function toMovie(row: MovieRow): CinemaMovie {
     providerMovieId: row.id,
     title: row.title.en.trim(),
     alternateTitles: hasAlternateTitle ? [alternateTitle] : [],
+    ...(row.releaseDate ? { releaseDate: row.releaseDate } : {}),
     ...(releaseYear ? { releaseYear } : {}),
     ...(typeof row.tmdbId === "number" && Number.isInteger(row.tmdbId) ? { tmdbId: row.tmdbId } : {}),
     formats: [...new Set((row.formats ?? []).map(formatOf))],

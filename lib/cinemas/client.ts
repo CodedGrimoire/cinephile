@@ -41,6 +41,7 @@ function isMovie(value: unknown): value is CinemaMovie {
   return typeof item?.providerMovieId === "string" && typeof item.title === "string" && Array.isArray(item.alternateTitles) &&
     item.alternateTitles.every((title) => typeof title === "string") && Array.isArray(item.formats) &&
     item.formats.every((format) => ["2D", "3D", "IMAX", "ATMOS", "UNKNOWN"].includes(String(format))) &&
+    (item.releaseDate === undefined || typeof item.releaseDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.releaseDate)) &&
     (item.releaseYear === undefined || (typeof item.releaseYear === "number" && Number.isInteger(item.releaseYear))) &&
     (item.tmdbId === undefined || (typeof item.tmdbId === "number" && Number.isInteger(item.tmdbId))) &&
     (item.imdbId === undefined || typeof item.imdbId === "string") &&

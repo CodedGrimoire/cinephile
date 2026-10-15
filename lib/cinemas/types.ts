@@ -15,6 +15,7 @@ export type CinemaMovie = {
   providerMovieId: string;
   title: string;
   alternateTitles: string[];
+  releaseDate?: string;
   releaseYear?: number;
   tmdbId?: number;
   imdbId?: string;

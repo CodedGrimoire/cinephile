@@ -42,9 +42,7 @@ export function matchScreeningToWatchlist(
   const entries = watchlist.map((movie) => ({
     movie,
     candidate: {
-      // Discovery movies carry an internal `tmdb-...` wishlist key when OMDb has
-      // no IMDb mapping. It is not an IMDb identifier, so keep title/year fallback available.
-      ...(/^tt\d+$/.test(movie.imdbID) ? { imdbId: movie.imdbID } : {}),
+      imdbId: movie.imdbID,
       title: movie.Title,
       year: movie.Year,
     } satisfies MovieCandidate,
