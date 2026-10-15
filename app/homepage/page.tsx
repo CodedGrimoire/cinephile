@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { app, db } from "@/firebaseConfig";
 import { doc, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { dhakaDate } from "@/lib/cinemas/calendar";
 
 interface Movie {
   Title: string;
@@ -79,21 +80,47 @@ export default function Homepage() {
 
   const search = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === "Enter") {
+      const query = s.trim();
+      if (!query) return;
       setLoading(true);
-      axios
-        .get<OMDBResponse>(`${apikey}&s=${s}`)
-        .then(async (response) => {
-          const searchResults = response.data.Search || [];
-          const detailedResults = await Promise.all(
-            searchResults.map((movie) => fetchMovieDetails(movie))
+      const year = dhakaDate().slice(0, 4);
+      const fetchSearchPage = (searchYear?: string, page = 1) => {
+        const params = new URLSearchParams({ s: query, page: String(page), ...(searchYear ? { y: searchYear } : {}) });
+        return axios.get<OMDBResponse>(`${apikey}&${params.toString()}`);
+      };
+
+      void (async () => {
+        try {
+          // OMDb's default search can omit current-year titles from its first page.
+          // Search the current year explicitly, then merge the regular results.
+          const [generalResponse, currentYearFirstPage] = await Promise.all([
+            fetchSearchPage(),
+            fetchSearchPage(year),
+          ]);
+          const currentYearResults = currentYearFirstPage.data.Response === "True"
+            ? currentYearFirstPage.data.Search ?? []
+            : [];
+          const totalCurrentYear = Number(currentYearFirstPage.data.totalResults ?? 0);
+          const extraPages = Math.min(2, Math.max(0, Math.ceil(totalCurrentYear / 10) - 1));
+          const additionalYearPages = await Promise.all(
+            Array.from({ length: extraPages }, (_, index) => fetchSearchPage(year, index + 2))
           );
+          const currentYearMatches = [
+            ...currentYearResults,
+            ...additionalYearPages.flatMap((response) => response.data.Response === "True" ? response.data.Search ?? [] : []),
+          ];
+          const regularMatches = generalResponse.data.Response === "True" ? generalResponse.data.Search ?? [] : [];
+          const uniqueMatches = [...currentYearMatches, ...regularMatches].filter((movie, index, all) =>
+            all.findIndex((candidate) => candidate.imdbID === movie.imdbID) === index
+          );
+          const detailedResults = await Promise.all(uniqueMatches.map((movie) => fetchMovieDetails(movie)));
           setResults(detailedResults);
-          setLoading(false);
-        })
-        .catch((error: unknown) => {
+        } catch (error: unknown) {
           console.error("Error fetching data:", error);
+        } finally {
           setLoading(false);
-        });
+        }
+      })();
     }
   };
 
