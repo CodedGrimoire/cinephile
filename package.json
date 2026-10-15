@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "npm run test:cinemas",
     "lint": "eslint .",
     "test:cinemas": "tsc -p tsconfig.cinema-tests.json && node --test /private/tmp/cinephile-cinema-test-build/tests/cinemas.test.js"
   },

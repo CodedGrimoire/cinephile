@@ -42,6 +42,7 @@ function isMovie(value: unknown): value is CinemaMovie {
     item.alternateTitles.every((title) => typeof title === "string") && Array.isArray(item.formats) &&
     item.formats.every((format) => ["2D", "3D", "IMAX", "ATMOS", "UNKNOWN"].includes(String(format))) &&
     (item.releaseYear === undefined || (typeof item.releaseYear === "number" && Number.isInteger(item.releaseYear))) &&
+    (item.tmdbId === undefined || (typeof item.tmdbId === "number" && Number.isInteger(item.tmdbId))) &&
     (item.imdbId === undefined || typeof item.imdbId === "string") &&
     (item.officialUrl === undefined || typeof item.officialUrl === "string");
 }
@@ -53,19 +54,26 @@ function isShowtime(value: unknown): value is Showtime {
     price.amount >= 0 && price.currency === "BDT");
   const validSeats = item?.seatsRemaining === undefined || (typeof item.seatsRemaining === "number" &&
     Number.isInteger(item.seatsRemaining) && item.seatsRemaining >= 0);
+  const priceRange = record(item?.priceRange);
+  const validPriceRange = item?.priceRange === undefined || Boolean(priceRange && typeof priceRange.min === "number" &&
+    Number.isFinite(priceRange.min) && typeof priceRange.max === "number" && Number.isFinite(priceRange.max) &&
+    priceRange.min >= 0 && priceRange.max >= priceRange.min && priceRange.currency === "BDT");
   const validBookingUrl = item?.officialBookingUrl === undefined || (typeof item.officialBookingUrl === "string" &&
     safeBookingUrl(item.officialBookingUrl) === item.officialBookingUrl);
   const validAvailabilityState = item?.availabilityState === undefined ||
     ["availability_unknown", "seats_available", "sold_out"].includes(String(item.availabilityState));
   const startsAt = typeof item?.startsAt === "string" ? new Date(item.startsAt) : null;
   return typeof item?.id === "string" && typeof item.movieId === "string" && typeof item.movieTitle === "string" &&
+    (item.movieAlternateTitles === undefined || Array.isArray(item.movieAlternateTitles) && item.movieAlternateTitles.every((title) => typeof title === "string")) &&
+    (item.movieTmdbId === undefined || typeof item.movieTmdbId === "number" && Number.isInteger(item.movieTmdbId)) &&
     (item.movieImdbId === undefined || typeof item.movieImdbId === "string" && /^tt\d+$/.test(item.movieImdbId)) &&
     (item.movieReleaseYear === undefined || typeof item.movieReleaseYear === "number" && Number.isInteger(item.movieReleaseYear)) &&
     typeof item.cinemaId === "string" && typeof item.cinemaName === "string" && typeof item.date === "string" &&
     /^\d{4}-\d{2}-\d{2}$/.test(item.date) && startsAt !== null && Number.isFinite(startsAt.getTime()) &&
     dateInTimezone(startsAt, "Asia/Dhaka") === item.date && typeof item.format === "string" &&
     ["2D", "3D", "IMAX", "ATMOS", "UNKNOWN"].includes(item.format) &&
-    ["available", "limited", "sold_out", "unknown"].includes(String(item.availability)) && validPrice && validSeats && validBookingUrl && validAvailabilityState;
+    ["available", "limited", "sold_out", "unknown"].includes(String(item.availability)) && validPrice && validPriceRange && validSeats && validBookingUrl && validAvailabilityState &&
+    (item.salesStatus === undefined || typeof item.salesStatus === "string");
 }
 
 async function readResponse<T>(
@@ -127,8 +135,8 @@ export class CinemaApiClient {
     return this.request(`/api/cinemas/showtimes?${query.toString()}`, signal, this.showtimeListing);
   }
 
-  async getDailyShowtimes(date: string, signal?: AbortSignal): Promise<CinemaClientResult<ShowtimeListing>> {
-    const query = new URLSearchParams({ date });
+  async getDailyShowtimes(date: string, signal?: AbortSignal, refresh = false): Promise<CinemaClientResult<ShowtimeListing>> {
+    const query = new URLSearchParams({ date, ...(refresh ? { refresh: "1" } : {}) });
     return this.request(`/api/cinemas/showtimes?${query.toString()}`, signal, this.showtimeListing);
   }
 

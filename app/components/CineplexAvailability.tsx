@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CinemaApiClient,
   formatDhakaDateTime,
@@ -30,12 +30,15 @@ export default function CineplexAvailability({ watchlist }: { watchlist: Watchli
   const [date, setDate] = useState(() => dhakaDate());
   const [result, setResult] = useState<CinemaClientResult<ShowtimeListing> | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const forceRefreshRef = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
     setResult(null);
     if (watchlist.length === 0) return () => controller.abort();
-    void apiClient.getDailyShowtimes(date, controller.signal).then((response) => {
+    const forceRefresh = forceRefreshRef.current;
+    forceRefreshRef.current = false;
+    void apiClient.getDailyShowtimes(date, controller.signal, forceRefresh).then((response) => {
       if (!controller.signal.aborted) setResult(response);
     });
     return () => controller.abort();
@@ -61,7 +64,7 @@ export default function CineplexAvailability({ watchlist }: { watchlist: Watchli
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/75">Star Cineplex</p>
           <h2 id="cineplex-availability-title" className="mt-1 text-2xl font-bold sm:text-3xl">Your Watchlist at Star Cineplex</h2>
-          <p className="mt-2 max-w-2xl text-sm text-white/60">Only watchlist movies with a confidently matched screening for the selected Bangladesh date appear here.</p>
+          <p className="mt-2 max-w-2xl text-sm text-white/60">Only watchlist movies with a confidently matched screening for the selected Bangladesh date appear here. Seat counts and prices are provider-reported snapshots and can change; they do not reserve seats.</p>
         </div>
         <label className="text-sm text-white/75">
           Date <span className="text-xs text-white/45">(Bangladesh time)</span>
@@ -103,7 +106,10 @@ export default function CineplexAvailability({ watchlist }: { watchlist: Watchli
                         <p className="mt-1 text-xs text-white/50">
                           {availabilityLabel(showtime)}
                           {typeof showtime.seatsRemaining === "number" && ` · ${showtime.seatsRemaining} seats reported`}
-                          {showtime.price && ` · BDT ${showtime.price.amount}`}
+                          {showtime.priceRange
+                            ? ` · BDT ${showtime.priceRange.min}${showtime.priceRange.max !== showtime.priceRange.min ? `–${showtime.priceRange.max}` : ""}`
+                            : showtime.price && ` · BDT ${showtime.price.amount}`}
+                          {showtime.salesStatus && ` · ${showtime.salesStatus}`}
                         </p>
                         <a href={safeBookingUrl(showtime.officialBookingUrl)} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm text-cyan-100 underline underline-offset-4">
                           Official booking
@@ -131,7 +137,7 @@ export default function CineplexAvailability({ watchlist }: { watchlist: Watchli
         <a href={OFFICIAL_SCHEDULE_URL} target="_blank" rel="noopener noreferrer" className="text-sm text-cyan-100 underline decoration-cyan-100/40 underline-offset-4">
           Official Star Cineplex schedule
         </a>
-        <button type="button" disabled={!result} onClick={() => setRetryKey((key) => key + 1)} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50">
+        <button type="button" disabled={!result} onClick={() => { forceRefreshRef.current = true; setRetryKey((key) => key + 1); }} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white/80 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-300 disabled:opacity-50">
           Refresh
         </button>
       </div>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BoundedAsyncCache } from "../lib/cinemas/cache";
-import { cacheableShowtimeSchedule } from "../lib/cinemas/route-cache";
+import { cacheable } from "../lib/cinemas/route-cache";
 import { matchMovieTitle } from "../lib/cinemas/matching";
 import { matchScreeningToWatchlist } from "../lib/cinemas/wishlist-intersection";
 import { normalizeShowtimes, safeProviderError } from "../lib/cinemas/normalize";
@@ -66,6 +66,24 @@ test("watchlist intersection excludes ambiguous title and year matches", () => {
   assert.equal(result, null);
 });
 
+test("watchlist intersection honors TMDb IDs, provider localized aliases, and unique encore releases", () => {
+  const byTmdb = matchScreeningToWatchlist({ movieTitle: "Avengers Endgame: Encore", movieTmdbId: 299534, movieReleaseYear: 2026 }, [
+    { imdbID: "tt4154796", Title: "Avengers: Endgame", Year: "2019", tmdbId: 299534 },
+  ]);
+  assert.equal(byTmdb?.movie.imdbID, "tt4154796");
+
+  const byLocalizedTitle = matchScreeningToWatchlist({ movieTitle: "Abar Hothat Brishti", movieAlternateTitles: ["আবার হঠাৎ বৃষ্টি"], movieReleaseYear: 2026 }, [
+    { imdbID: "tt0000001", Title: "আবার হঠাৎ বৃষ্টি", Year: "2026" },
+  ]);
+  assert.equal(byLocalizedTitle?.movie.imdbID, "tt0000001");
+
+  const ambiguousEncore = matchScreeningToWatchlist({ movieTitle: "Avengers Endgame: Encore", movieTmdbId: 299534, movieReleaseYear: 2026 }, [
+    { imdbID: "tt4154796", Title: "Avengers: Endgame", Year: "2019" },
+    { imdbID: "tt9999999", Title: "Avengers Endgame", Year: "2026" },
+  ]);
+  assert.equal(ambiguousEncore, null);
+});
+
 test("empty schedules mean no match, while malformed payloads are provider errors", () => {
   assert.deepEqual(normalizeShowtimes({ showtimes: [] }, context), { state: "confirmed_no_screenings", screenings: [] });
   assert.throws(() => normalizeShowtimes({ unexpected: true }, context));
@@ -90,22 +108,23 @@ test("unknown availability is not sold out; sold out requires an explicit provid
   assert.equal(parsed.screenings[1].availabilityState, "sold_out");
 });
 
-test("schedule cache excludes dynamic seat counts and availability", () => {
-  const unknown = normalizeShowtimes({ showtimes: [{ id: "unknown", startsAt: "2026-10-16T12:00:00Z" }] }, context).screenings;
-  const withSeatData = normalizeShowtimes({ showtimes: [{
-    id: "available", startsAt: "2026-10-16T12:00:00Z", availability: "available", seatsRemaining: 12,
-  }] }, context).screenings;
+test("live schedule cache accepts available snapshots and rejects provider failures", () => {
   const base = {
-    state: "available" as const,
     availabilityState: "data_available" as const,
-    capability: "showtimes",
+    capability: "showtimes" as const,
     capabilities: { branches: "available" as const, catalogue: "provider_unavailable" as const, showtimes: "available" as const, prices: "data_unavailable" as const, seats: "provider_unavailable" as const },
     freshness: "current" as const,
     matchConfidence: "not_applicable" as const,
     source: { provider: "star-cineplex" as const, sourceUrl: "https://starcineplex.com/showtimes", mode: "provider-feed" as const },
   };
-  assert.equal(cacheableShowtimeSchedule({ ...base, data: { state: "screening_scheduled", screenings: unknown } }), true);
-  assert.equal(cacheableShowtimeSchedule({ ...base, data: { state: "screening_scheduled", screenings: withSeatData } }), false);
+  assert.equal(cacheable({ ...base, state: "available", data: { state: "screening_scheduled", screenings: [] } }), true);
+  assert.equal(cacheable({
+    ...base,
+    state: "unavailable",
+    availabilityState: "provider_unavailable",
+    freshness: "not_retrieved",
+    message: "upstream unavailable",
+  }), false);
 });
 
 test("movie matching handles punctuation/year and reports title collisions as ambiguous", () => {
@@ -129,42 +148,45 @@ test("query validation bounds movie text and requires a real ISO calendar date",
   assert.equal(validateScheduleDate("2026-02-30").valid, false);
 });
 
-test("provider keeps unverified catalogue unavailable rather than reporting no screenings", async () => {
-  const provider = new StarCineplexProvider();
-  const branches = await provider.getLocations();
-  assert.equal(branches.state, "available");
-  assert.equal(branches.capability, "branches");
-  assert.equal(branches.freshness, "dated_snapshot");
-  assert.equal(branches.capabilities.catalogue, "provider_unavailable");
-  assert.equal(branches.capabilities.showtimes, "provider_unavailable");
-  assert.equal(branches.capabilities.prices, "data_unavailable");
-  const catalogue = await provider.getMovies();
-  assert.equal(catalogue.state, "unavailable");
-  assert.equal(catalogue.availabilityState, "provider_unavailable");
-  assert.equal(catalogue.capability, "catalogue");
-  const result = await provider.getShowtimes("Example", "2026-10-16");
-  assert.equal(result.state, "unavailable");
-  assert.equal(result.availabilityState, "provider_unavailable");
-  assert.equal(result.capability, "showtimes");
-  assert.equal((await provider.getDailySchedule("2026-10-16")).state, "unavailable");
+test("Star Cineplex API rows join by provider IDs and preserve explicit dates, price, and seat snapshots", async () => {
+  const source = {
+    movies: [{ id: "movie-1", title: { en: "Sample Film" }, slug: "sample-film", releaseDate: "2026-10-15", formats: ["2D"] }],
+    venues: [{ id: "venue-1", name: { en: "Sample Branch" }, slug: "sample-branch", cityName: "Dhaka", shortCode: "SMP" }],
+    shows: [{
+      id: "show-1", movieId: "movie-1", venueId: "venue-1", date: "2026-10-16", time: "15:30", format: "2D",
+      status: "Selling", availableSeats: 18, totalSeats: 200, priceRange: { minPaisa: 55000, maxPaisa: 65000 },
+    }],
+  };
+  const readJson = async (url: string) => url.endsWith("/movies") ? source.movies : url.endsWith("/venues") ? source.venues : source.shows;
+  const provider = new StarCineplexProvider(readJson);
+  const movies = await provider.getMovies();
+  assert.equal(movies.state, "available");
+  if (movies.state !== "available") return;
+  assert.equal(movies.data[0].providerMovieId, "movie-1");
+  const result = await provider.getDailySchedule("2026-10-16");
+  assert.equal(result.state, "available");
+  if (result.state !== "available") return;
+  const screening = result.data.screenings[0];
+  assert.equal(screening.movieTitle, "Sample Film");
+  assert.equal(screening.cinemaName, "Sample Branch");
+  assert.equal(screening.date, "2026-10-16");
+  assert.equal(screening.startsAt, "2026-10-16T09:30:00.000Z");
+  assert.deepEqual(screening.priceRange, { min: 550, max: 650, currency: "BDT" });
+  assert.equal(screening.seatsRemaining, 18);
+  assert.equal(screening.salesStatus, "Selling");
+  assert.equal(screening.availabilityState, "seats_available");
 });
 
-test("authorized provider adapters are injectable while the production default stays inactive", async () => {
-  const defaultProvider = new StarCineplexProvider();
-  assert.equal((await defaultProvider.getMovies()).state, "unavailable");
-
-  const fallback = await defaultProvider.getDailySchedule("2026-10-16");
-  let requestedDate = "";
-  const configuredProvider = new StarCineplexProvider({
-    getDailySchedule: async (date) => {
-      requestedDate = date;
-      return fallback;
-    },
-  });
-  assert.equal(await configuredProvider.getDailySchedule("2026-10-17"), fallback);
-  assert.equal(requestedDate, "2026-10-17");
-  assert.equal((await configuredProvider.getMovies()).state, "unavailable");
-  assert.equal((await configuredProvider.getShowtimes("Film", "2026-10-17")).state, "unavailable");
+test("provider does not claim a schedule is empty outside the dates published by Star Cineplex", async () => {
+  const source = {
+    movies: [{ id: "movie-1", title: { en: "Sample Film" }, slug: "sample-film" }],
+    venues: [{ id: "venue-1", name: { en: "Sample Branch" }, slug: "sample-branch", cityName: "Dhaka" }],
+    shows: [{ id: "show-1", movieId: "movie-1", venueId: "venue-1", date: "2026-10-16", time: "15:30" }],
+  };
+  const readJson = async (url: string) => url.endsWith("/movies") ? source.movies : url.endsWith("/venues") ? source.venues : source.shows;
+  const result = await new StarCineplexProvider(readJson).getDailySchedule("2026-10-20");
+  assert.equal(result.state, "unavailable");
+  if (result.state === "unavailable") assert.match(result.message, /has not published a schedule/);
 });
 
 test("provider request errors are sanitized and private hosts are rejected", async () => {

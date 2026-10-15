@@ -11,6 +11,10 @@ export class BoundedAsyncCache<T> {
     private readonly maxEntries = 100,
   ) {}
 
+  delete(key: string): void {
+    this.entries.delete(key);
+  }
+
   async get(
     key: string,
     loader: () => Promise<T>,

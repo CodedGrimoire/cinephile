@@ -7,7 +7,7 @@ export class ProviderRequestError extends Error {
 
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
-/** Use only for a provider URL whose feed and permitted access have been verified. */
+/** Only the public Star Cineplex site and its public read API are allowed upstream hosts. */
 export async function fetchProviderJson(
   urlValue: string,
   fetcher: FetchLike = fetch,
@@ -19,16 +19,33 @@ export async function fetchProviderJson(
   } catch {
     throw new ProviderRequestError();
   }
-  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || !(url.hostname === "starcineplex.com" || url.hostname.endsWith(".starcineplex.com"))) {
+  const allowedHost = url.hostname === "starcineplex.com" || url.hostname.endsWith(".starcineplex.com") || url.hostname === "api.kichole.com";
+  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || !allowedHost) {
     throw new ProviderRequestError();
   }
 
   try {
-    const response = await fetcher(url, {
+    let response = await fetcher(url, {
+      credentials: "omit",
       headers: { Accept: "application/json" },
+      redirect: "error",
       signal: AbortSignal.timeout(timeoutMs),
       cache: "no-store",
     });
+    // One bounded retry for transient upstream failures. Honor Retry-After only
+    // up to two seconds; there is no documented rate limit to rely on.
+    if ([429, 502, 503, 504].includes(response.status)) {
+      const retryAfter = Number(response.headers.get("retry-after"));
+      const delayMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 2_000) : 250;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      response = await fetcher(url, {
+        credentials: "omit",
+        headers: { Accept: "application/json" },
+        redirect: "error",
+        signal: AbortSignal.timeout(timeoutMs),
+        cache: "no-store",
+      });
+    }
     if (!response.ok) throw new ProviderRequestError();
     return await response.json() as unknown;
   } catch {

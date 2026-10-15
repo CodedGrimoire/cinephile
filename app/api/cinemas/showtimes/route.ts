@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cacheableShowtimeSchedule, showtimeCache, withStaleMetadata } from "@/lib/cinemas/route-cache";
+import { cacheable, liveScheduleCache } from "@/lib/cinemas/route-cache";
 import { validateScheduleDate, validateShowtimeQuery } from "@/lib/cinemas/query-validation";
 import { starCineplexProvider } from "@/lib/cinemas/star-cineplex";
 import { STAR_CINEPLEX_CAPABILITIES } from "@/lib/cinemas/types";
@@ -9,6 +9,7 @@ export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   const movieQuery = request.nextUrl.searchParams.get("movie");
   const dateQuery = request.nextUrl.searchParams.get("date");
+  const forceRefresh = request.nextUrl.searchParams.get("refresh") === "1";
   const dateValidation = validateScheduleDate(dateQuery);
   const movieValidation = request.nextUrl.searchParams.has("movie")
     ? validateShowtimeQuery(movieQuery, dateQuery)
@@ -27,13 +28,13 @@ export async function GET(request: NextRequest) {
     const loader = () => movie
       ? starCineplexProvider.getShowtimes(movie, date)
       : starCineplexProvider.getDailySchedule(date);
-    const cached = await showtimeCache.get(cacheKey, loader, cacheableShowtimeSchedule);
-    const result = withStaleMetadata(cached.value, cached.stale);
+    if (forceRefresh) liveScheduleCache.delete(cacheKey);
+    const cached = await liveScheduleCache.get(cacheKey, loader, cacheable);
+    const result = cached.value;
     const status = result.state === "available" ? 200 : result.state === "unavailable" ? 503 : 502;
-    const mayCache = cacheableShowtimeSchedule(result);
     return NextResponse.json(result, {
       status,
-      headers: { "Cache-Control": mayCache ? "public, s-maxage=720, stale-while-revalidate=1800" : "no-store" },
+      headers: { "Cache-Control": "no-store" },
     });
   } catch {
     return NextResponse.json({
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       freshness: "not_retrieved",
       matchConfidence: "not_applicable",
       message: "Showtimes could not be retrieved from Star Cineplex.",
-      source: { provider: "star-cineplex", sourceUrl: "https://starcineplex.com/showtimes", checkedAt: new Date().toISOString(), mode: "provider-feed" },
+      source: { provider: "star-cineplex", sourceUrl: "https://api.kichole.com/inventory/api/shows", checkedAt: new Date().toISOString(), mode: "provider-feed" },
     }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
 }

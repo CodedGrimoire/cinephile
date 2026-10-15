@@ -1,102 +1,81 @@
-# Star Cineplex integration
+# Star Cineplex live schedule integration
 
-## Status verified 2026-10-15
+## Current behavior
 
-Cinephile currently provides a dated nine-branch directory snapshot. It does not ingest the official movie catalogue, dated showtimes, prices, or seat inventory. The official site publicly renders some of those details, but this review could not verify permission for automated retrieval or a documented feed. No live data is represented as integrated.
+Cinephile now reads the same public, read-only JSON endpoints used by the Star Cineplex frontend:
 
-The official pages examined were:
+- Movies: https://api.kichole.com/catalog/api/movies
+- Venues: https://api.kichole.com/catalog/api/venues
+- Shows: https://api.kichole.com/inventory/api/shows
 
-- [Home](https://starcineplex.com/)
-- [Now Showing](https://starcineplex.com/movies?status=now-showing)
-- [Coming Soon](https://starcineplex.com/movies?status=coming-soon)
-- [Showtimes](https://starcineplex.com/showtimes)
-- [Branches](https://starcineplex.com/branches)
-- [Ticket prices](https://starcineplex.com/ticket-price)
-- [Contact](https://starcineplex.com/contact)
-- `https://starcineplex.com/robots.txt`
+The server sends ordinary HTTPS GET requests with an Accept: application/json header. It sends no Origin, browser headers, cookies, or bearer token; cookies are explicitly omitted and redirects are rejected. It does not call the organization-protected halls route or any seat-locking, booking, payment, or reservation operation.
 
-The official home page and search-indexed page content currently expose Now Showing and Coming Soon titles, genres, language, runtime, and formats; some movie content includes a year. Branch pages expose branch identifiers and addresses, halls and hall capacities, and showtime listings. The showtimes page is a public schedule entry point. The ticket price guide exposes seat-class and time-band prices and describes those prices as indicative; it says the exact price appears at seat selection. These pages demonstrate what the official site publishes, but not a permission to harvest or redistribute it.
+Show records are joined to movies by movieId and venues by venueId. Cinephile uses the date carried on each show record and its local HH:mm value; it does not infer a calendar date from a repeated clock time. The time is interpreted in Asia/Dhaka. Movie matching first uses a matching TMDb ID if that optional ID is present in the wishlist. Current wishlist records contain IMDb IDs, not TMDb IDs, so the normal path requires an exact normalized English or Bengali title and matching release year. A unique exact base-title match is allowed for Star's explicit “Encore” re-release suffix; ambiguous matches remain excluded. Fuzzy title similarity is not used.
 
-The public pages expose useful schedule information in rendered/indexed page content (details below), but the raw initial HTML and browser network responses could not be inspected from this environment. No documented public API/export/feed or stable machine-readable response contract was found. Seat inventory was not exposed as a supported source. `robots.txt` could not be retrieved by the research browser, and direct HTTPS access from the development environment failed with DNS resolution error (`curl: (6) Could not resolve host: starcineplex.com`). No automation policy or terms authorizing programmatic reuse were found. The official contact page lists hotline `09617660660` / `01755665544` and an email link; ask the operator for written terms and a read-only feed.
+Prices are converted from paisa to BDT and shown as the provider's min–max range. Available seats and sales status are displayed as provider-reported snapshots with the retrieval time. They are not reservations or guarantees. Past showtimes on the current Bangladesh date are filtered out. If the API has not published the selected date, Cinephile reports that schedule as unavailable rather than claiming there are no screenings.
 
-The dates and details above are a source review, not an assertion that the page content stays current. Movie and showtime pages may change daily. Community code that describes browser sessions, CAPTCHA or ticket API access is not an authorized source and is not used.
+Available schedules are cached per server process for 60 seconds, with concurrent requests coalesced. A manual refresh bypasses and replaces that entry. Provider errors are not cached, and expired seat snapshots are never served. Because this is in-process memory, serverless instances have separate caches and a cold/new instance fetches its own snapshot; this is a short traffic reduction window, not shared or durable caching. Upstream calls have an 8-second timeout and at most one retry for 429/502/503/504 responses; Retry-After is capped at two seconds. No credentials are exposed to browser clients.
 
-## Phase 4 public-page inspection (2026-10-15)
+## Independent-access verification (2026-10-15)
 
-Official page snapshots were inspected for the [home page](https://starcineplex.com/), [Bangladesh Military Museum branch](https://starcineplex.com/branches/bangladesh-military-museum), [Shimanto Tower branch](https://starcineplex.com/branches/shimanto-tower-narayanganj), [Evil Dead Burn movie page](https://starcineplex.com/movies/evil-dead-burn), and [general showtimes page](https://starcineplex.com/showtimes). The research browser returned useful indexed/rendered text for the home, branch, and movie pages; the general showtimes page and `robots.txt` could not be opened there. This establishes that the public pages display schedule-like content to users, but it does not establish whether each field is in the initial HTTP HTML or injected during browser execution. Raw HTTP source and browser network inspection were unavailable because this environment could not resolve the site host.
+Unauthenticated GETs from a server-side Node process, without cookies or browser headers, returned HTTP 200 JSON:
 
-- The home page lists Now Showing and Coming Soon movies and links to branches. Its extracted snapshot includes release year, runtime, language, and formats for some titles.
-- Branch pages group movies under “Showtimes at this branch” and expose hall names, format, and times. Times repeat in the extracted text without a date label attached to each occurrence, so branch pages alone cannot safely assign a calendar date to a time. Hall seat capacity is descriptive and is not ticket inventory.
-- A movie detail page exposes movie metadata and “Showtimes by branch”; the snapshot includes a row of relative date choices and, for a selected date, branch, hall, format, time, and indicative price. A stable date value bound to every time and a booking URL were not confirmed in raw markup. A selected-date UI is promising, but not enough to build a robust parser without checking actual responses across date changes.
-- The general showtimes route could not be inspected. No provider IMDb identifier was observed. OMDb matching could use exact title plus release year only after extracting that year reliably; ambiguous titles must remain unresolved.
+| Endpoint | Response |
+|---|---|
+| /catalog/api/movies | 39 movie records |
+| /catalog/api/venues | 9 venue records |
+| /inventory/api/shows | 300 show records across 2026-10-15, 2026-10-16, and 2026-10-17 |
 
-Permission remains unverified. No terms or automation policy authorizing automated retrieval/reuse were found, and `robots.txt` was unreachable. Written authorization is missing for read-only retrieval and display, along with an approved access method, request-rate limits, caching/freshness rules, attribution, and reuse terms. Public visibility by itself is not treated as permission.
+All 300 schedule rows joined to a returned movie and venue in the observed response. Records included explicit date, time, movieId, venueId, hallId, format, status, availableSeats, totalSeats, and priceRange. The response headers did not include Retry-After or rate-limit headers. A date=2026-10-15 query still returned 300 rows across all three dates, so Cinephile filters only on the explicit date field in each record.
 
-## Capability matrix
+At 2026-10-15 10:35 UTC, Cinephile's production API route returned 100 records for 2026-10-16 after joining and validation. It returned 35 future screenings for 2026-10-15 at 16:35 Bangladesh time; every returned same-day start time was after the request time. Five real records from the 2026-10-16 response were:
 
-| Capability | Cinephile status | Evidence and limit |
+- Avengers Endgame: Encore · Bali Arcade, Chattogram · 2026-10-16 11:00 · 2D · BDT 500 · 85 seats reported · Selling
+- Spider-Man: Brand New Day · Bashundhara City Shopping Mall, Panthapath · 2026-10-16 11:00 · 2D · BDT 850 · 113 seats reported · Selling
+- Street Fighter · Bashundhara City Shopping Mall, Panthapath · 2026-10-16 11:10 · 2D · BDT 550–650 · 241 seats reported · Selling
+- Spider-Man: Brand New Day · Bali Arcade, Chattogram · 2026-10-16 11:15 · 2D · BDT 500 · 125 seats reported · Selling
+- Resident Evil · Centrepoint, Uttara · 2026-10-16 11:15 · 2D · BDT 650 · 175 seats reported · Selling
+
+The exact source for these records was https://api.kichole.com/inventory/api/shows; the route response timestamp was 2026-10-15T10:35:27.098Z. The app's repeated request reused the same timestamp; a forced refresh produced a new timestamp and replaced the cached value.
+
+### Wishlist matching spot checks (2026-10-15)
+
+The live 2026-10-16 Cinephile response was also checked against representative wishlist title/year values (isolated match candidates, not a user's Firestore list). Each candidate matched one real screening:
+
+| Screening title | Provider release date / Bangladesh date | Match checked |
 |---|---|---|
-| Branch directory | Available as a dated snapshot | Official branch directory lists nine branches. The API snapshot was transcribed on 2026-10-15; it is not refreshed automatically. |
-| Now Showing / Coming Soon catalogue | Provider unavailable | Current titles are publicly rendered on official pages, but there is no verified authorized machine-readable source. |
-| Date-specific showtimes | Provider unavailable | Official pages display showtime content, but no permitted feed and stable date/branch response were verified. No individual times are imported. |
-| Ticket prices | Data unavailable in Cinephile | Official indicative prices are public, but are not attached to a show or verified via a permitted feed. Exact show price is said to appear at seat selection. |
-| Seat availability | Provider unavailable | No authorized live inventory source was found. Never infer seats available or sold out from a schedule or venue capacity. |
+| Resident Evil | 2026-09-16 / 2026-10-02 | Exact title and year |
+| Digger | 2026-09-30 / 2026-10-02 | Exact title and year |
+| Mutiny | 2026-08-19 / 2026-09-25 | Exact title and year |
+| Spider-Man: Brand New Day | 2026-01-01 / not supplied | Exact full title, including subtitle |
+| Avengers Endgame: Encore | 2026-09-25 / 2026-09-25 | Unique “Avengers: Endgame” base title (0.9 confidence) |
 
-The capability metadata is included in all provider results. `availabilityState` and `freshness` make unavailable and dated data explicit. `provider_unavailable` means no verified provider integration is configured; `data_unavailable` means this Cinephile capability has no usable data. These states are not empty successful listings. The normalization contract distinguishes `confirmed_no_screenings` from `screening_scheduled`, and screening availability distinguishes `availability_unknown`, `seats_available`, and `sold_out`. A title is not classified as `not_in_current_catalogue` unless a current, complete catalogue can be verified; that evidence is not available today.
+The provider's Bengali title was also matched as an alternate title. These checks validate the normal current wishlist fields (IMDb ID, title, year) using exact title/year and supplied aliases. Existing Firestore wishlist records do not contain TMDb IDs, so stable TMDb matching is not available to the current signed-in user's data without a separate verified mapping.
 
-## Architecture and API
+The public halls request /catalog/api/halls?venueId=…&orgId=… returned HTTP 403 with FORBIDDEN_ORG / “You are not a member of this organization.” Cinephile does not retry it with credentials or otherwise attempt to obtain hall names. The schedule provides hallId, but the current UI does not display a hall name.
 
-Cinema integration lives under `lib/cinemas`. `star-cineplex.ts` provides the branch snapshot and unavailable states. It exposes a server-side `AuthorizedStarCineplexAdapter` constructor port for a future approved source; the production singleton is deliberately created with no adapter, so the catalogue and showtime routes remain unavailable. Its catalogue, movie-specific showtimes, and daily schedule methods are independently optional, allowing those capabilities to be enabled separately. `matching.ts` accepts exact IMDb identifiers or conservative normalized title/year matches; ambiguous and unresolved results remain separate. `normalize.ts` validates a canonical authorized schedule response shape, but its test input is synthetic and is not a real Star Cineplex payload. `request.ts` enforces HTTPS, a Star Cineplex host allowlist, an 8-second timeout, and sanitized errors for a future verified source. No provider credentials are currently configured.
+## Access conditions and limits
 
-All three routes return `source`, `capability`, `capabilities`, `availabilityState`, `freshness`, and `matchConfidence` (`not_applicable` until a catalogue is verified). For example, the branches endpoint returns `state: "available"`, `capability: "branches"`, `freshness: "dated_snapshot"`, a `retrievedAt` timestamp, and a `source` URL. Its branch rows are in `data`. The movie and showtime endpoints return HTTP 503 with `state: "unavailable"`, `availabilityState: "provider_unavailable"`, `freshness: "not_retrieved"`, and no fabricated listing. Unexpected errors return HTTP 502 with a sanitized `provider_error`. Invalid showtime query parameters return HTTP 400.
+The public Star Cineplex site frontend references these read endpoints. The direct requests above succeeded without authentication. No published API usage terms, rate limit, or explicit automated-use permission were found. https://starcineplex.com/terms, /terms-of-use, /terms-and-conditions, both robots.txt paths, and the API Swagger paths returned 404. This is not evidence of an API license or an unlimited request allowance; the implementation therefore uses only the frontend's public GET resources, limits request frequency with a short cache, and does not access organization-protected or state-changing routes. No rate limit was advertised in the observed response headers.
 
-```bash
-curl -i http://localhost:3000/api/cinemas
-curl -i http://localhost:3000/api/cinemas/movies
-curl -i 'http://localhost:3000/api/cinemas/showtimes?date=2026-10-16'
-curl -i 'http://localhost:3000/api/cinemas/showtimes?movie=Dune%3A%20Part%20Three&date=2026-10-16'
-```
+## UI
 
-Local API response examples captured on 2026-10-15 (these are Cinephile responses, not provider feed payloads): `/api/cinemas` returned HTTP 200 with `state: "available"`, `capability: "branches"`, `availabilityState: "data_available"`, `freshness: "dated_snapshot"`, and nine rows; the first row was Bali Arcade, Chattogram. `/api/cinemas/movies` returned HTTP 503 with `capability: "catalogue"`, `availabilityState: "provider_unavailable"`, `freshness: "not_retrieved"`, and a provider `checkedAt`. Both `/api/cinemas/showtimes?date=2026-10-16` and the compatible movie-filtered form returned HTTP 503 with `capability: "showtimes"`. An invalid calendar date returned HTTP 400. No actual Star Cineplex schedule payload was obtained.
+The existing Watchlist at Star Cineplex section requests the selected date when opened, displays only confidently matched watchlist titles, sorts by local showtime, and shows branch, date, time, format, price range, reported seat count, sales status, last-updated time, and an official schedule link. Refresh requests a new snapshot. If the provider fails validation or is unreachable, the UI reports the data unavailable rather than using old seat counts.
 
-The My Watchlist page contains a “Your Watchlist at Star Cineplex” section. It requests one date-specific schedule for the full cinema, then displays only the mutual set: movies in the user's watchlist that also have a screening in the verified schedule. Matching requires an exact provider IMDb ID or an exact normalized title and release year; ambiguous or incomplete matches are omitted. Matching screenings are grouped by watchlist movie with branch, Bangladesh-local time, format, availability state, and source freshness. An unavailable source shows an explicit message and the official schedule link; it does not substitute wishlist titles or sample listings. The earlier per-wishlist cinema button and modal have been removed. The existing per-movie API query remains supported for compatibility.
+## Verification
 
-## Configuration contract for authorized access
+- npm run test — 27 tests passed.
+- npx tsc --noEmit — passed.
+- npm run lint — passed with 13 existing warnings for image elements and hook dependencies outside this integration.
+- npm run build — passed. The build reports existing image-optimization and React hook-dependency warnings outside this integration.
+- Production app smoke — /api/cinemas/movies returned 200 with 39 movies; /api/cinemas returned 200 with 9 venues; /api/cinemas/showtimes?date=2026-10-15 returned 200 with 35 future screenings; /api/cinemas/showtimes?date=2026-10-16 returned 200 with 100 joined screenings; cached requests reused the original retrieval timestamp; &refresh=1 returned a newer timestamp and updated the cache.
+- Local app smoke — /api/cinemas/showtimes?date=2026-10-16 returned 200 with 100 live records; two sequential requests reused the same fetchedAt, and refresh=1 retrieved a new snapshot. An isolated demo-cinephile Auth/Firestore emulator account and watchlist document were created, written, and read successfully. No production Firestore data was accessed.
+- Interactive browser/mobile verification — not completed. The in-app browser failed to initialize with a sandboxPolicy bootstrap error, so no visual, responsive, or console result is claimed.
 
-No credentials or feed URL are set. Written authorization and a documented source contract must come first. A future adapter is supplied server-side through the `AuthorizedStarCineplexAdapter` constructor; the application currently injects none. If the approved source needs a URL or token, accept only a server-only configured URL for the explicitly approved HTTPS host/path and keep any token out of client responses and logs. Do not add a user-controlled upstream URL, generic proxy, browser session, CAPTCHA flow, undocumented ticket endpoint, or automatic ticket purchase. Record allowed request rates, cache rules, attribution, and the feed schema with the authorization.
+## Known limitations
 
-## Cache and reliability
-
-The bounded process-local cache uses a 12-minute successful schedule TTL, a 30-minute stale-if-refresh-fails window, a 100-entry cap, and duplicate request coalescing. Schedule data is cached only when seat availability is explicitly unknown and no remaining-seat count is present; responses carrying live availability or seat counts use `Cache-Control: no-store` and bypass the schedule cache. A future authorized seat inventory source must use a separate, shorter-lived cache. Errors and unavailable responses are not cached. A stale result is marked stale in both source metadata and freshness metadata. Branch snapshot freshness is `dated_snapshot`; it is never labelled live. Provider requests have an 8-second timeout and errors are sanitized. The provider receives only cinema query values, never Firebase or Firestore credentials.
-
-## Provider access request template
-
-**Subject: Request for read-only Star Cineplex cinema information feed**
-
-Hello Star Cineplex team,
-
-I am developing Cinephile, a personal movie watchlist application. I would like to ask whether Star Cineplex can authorize read-only access to an official feed or API for:
-
-- Branch identifiers, names, and addresses
-- Now Showing and Coming Soon movie catalogue, including provider movie IDs, original/alternate titles, and release dates where available
-- Date-specific showtimes by branch, including local date/time, format, and hall/screen
-- Published ticket prices and their applicable seat classes/time bands
-- Seat availability, if this may be shared outside the ticketing flow
-- Official booking links
-
-Please also share the permitted authentication method, rate limits, cache/freshness requirements, attribution requirements, data retention limits, and any restrictions on public display. Cinephile only needs read access and will not place or automate ticket purchases. We will not use CAPTCHA/session workarounds or undocumented private endpoints.
-
-Thank you,
-\[Name / contact\]
-
-## Validation and blockers
-
-On 2026-10-15, `npm ci --no-audit --no-fund` completed successfully; `npm run test:cinemas` passed all 26 tests; `npx tsc --noEmit` passed; and `npm run lint` exited successfully with 13 existing warnings (raw `<img>` usage and hook dependencies). `npm run build` passed after removing `next/font/google` and using local system font stacks, with the same warnings. The production server returned HTTP 200 for `/`, `/homepage`, `/mylist`, and `/api/cinemas`; HTTP 503 for `/api/cinemas/movies` and a valid date-specific showtime request; and HTTP 400 for an invalid date. This is consistent with the adapter remaining disabled without authorization. Browser console inspection and Firebase sign-in/Firestore actions were not performed; no valid test account was available. The prior watchlist section is date-wide and intersection-based, rather than a per-movie showtimes dialog, per the product clarification.
-
-Remaining blockers are written permission and a documented, stable feed contract for catalogue/showtimes/prices/seats; access to the host from this development environment; and current confirmation of the branch snapshot. Firebase login and Firestore watchlist behavior have not been manually tested as part of this integration.
-
-To activate the higher capability levels, obtain the written provider access above, verify a real permitted payload and its freshness, add a sanitized real-response fixture, implement the source adapter and cache rules, and then enable each capability independently. Do not claim any feature works based only on this document or on public website visibility.
-
-## Phase 5 readiness
-
-The application and production build are ready for ordinary project work. Live catalogue and showtime ingestion are not ready to activate: written permission, raw date-specific response verification, a stable source contract, and a reliable movie identity mapping are outstanding. With those items, an authorized adapter can be injected into the existing server-side provider boundary without changing the API contracts or wishlist intersection.
+- Hall names are unavailable without organization membership; only provider hallId is returned.
+- The provider did not publish a rate limit or an explicit automated-use policy. If Star Cineplex provides a usage limit or asks integrations to stop, the client must honor it.
+- Seat counts and prices are snapshots and may change before a user books.
+- Existing wishlist documents use IMDb IDs and do not include TMDb IDs. Exact title/alias plus year matching is used for them; the optional TMDb path is available only for wishlist records that already carry a verified TMDb ID.
+- The existing Firestore rules allow every authenticated user to read and write every document; tighten and validate these rules before deploying the app.

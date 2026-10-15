@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const result = await starCineplexProvider.getLocations();
     return NextResponse.json(result, {
-      headers: { "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800" },
+      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
     });
   } catch {
     return NextResponse.json({

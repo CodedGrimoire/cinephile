@@ -2,19 +2,11 @@ import { BoundedAsyncCache } from "./cache";
 import type { CinemaMovie, ProviderResult, ShowtimeResult } from "./types";
 
 export const movieListCache = new BoundedAsyncCache<ProviderResult<CinemaMovie[]>>();
-export const showtimeCache = new BoundedAsyncCache<ShowtimeResult>();
+// Seat counts are snapshots, so keep them briefly and never serve stale entries.
+export const liveScheduleCache = new BoundedAsyncCache<ShowtimeResult>(60_000, 0, 100);
 
 export function cacheable<T>(result: ProviderResult<T>): boolean {
   return result.state === "available";
-}
-
-export function cacheableShowtimeSchedule(result: ShowtimeResult): boolean {
-  if (result.state !== "available") return false;
-  return result.data.screenings.every((screening) =>
-    screening.availability === "unknown" &&
-    screening.availabilityState === "availability_unknown" &&
-    screening.seatsRemaining === undefined,
-  );
 }
 
 export function withStaleMetadata<T>(result: ProviderResult<T>, stale: boolean): ProviderResult<T> {

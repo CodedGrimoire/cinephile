@@ -16,6 +16,7 @@ export type CinemaMovie = {
   title: string;
   alternateTitles: string[];
   releaseYear?: number;
+  tmdbId?: number;
   imdbId?: string;
   formats: ScreeningFormat[];
   officialUrl?: string;
@@ -25,6 +26,8 @@ export type Showtime = {
   id: string;
   movieId: string;
   movieTitle: string;
+  movieAlternateTitles?: string[];
+  movieTmdbId?: number;
   movieImdbId?: string;
   movieReleaseYear?: number;
   cinemaId: string;
@@ -35,7 +38,9 @@ export type Showtime = {
   availability: AvailabilityStatus;
   availabilityState?: "availability_unknown" | "seats_available" | "sold_out";
   price?: { amount: number; currency: "BDT" };
+  priceRange?: { min: number; max: number; currency: "BDT" };
   seatsRemaining?: number;
+  salesStatus?: string;
   officialBookingUrl?: string;
 };
 
@@ -67,10 +72,10 @@ export type CinemaCapabilityMatrix = {
 // feature that may be visible on Star Cineplex's own website.
 export const STAR_CINEPLEX_CAPABILITIES: CinemaCapabilityMatrix = {
   branches: "available",
-  catalogue: "provider_unavailable",
-  showtimes: "provider_unavailable",
-  prices: "data_unavailable",
-  seats: "provider_unavailable",
+  catalogue: "available",
+  showtimes: "available",
+  prices: "available",
+  seats: "available",
 };
 
 export type CinemaAvailabilityState =

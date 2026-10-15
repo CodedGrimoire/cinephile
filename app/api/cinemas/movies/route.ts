@@ -23,7 +23,7 @@ export async function GET() {
       freshness: "not_retrieved",
       matchConfidence: "not_applicable",
       message: "Movie listings could not be retrieved from Star Cineplex.",
-      source: { provider: "star-cineplex", sourceUrl: "https://starcineplex.com/movies?status=now-showing", checkedAt: new Date().toISOString(), mode: "provider-feed" },
+      source: { provider: "star-cineplex", sourceUrl: "https://api.kichole.com/catalog/api/movies", checkedAt: new Date().toISOString(), mode: "provider-feed" },
     }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
 }
